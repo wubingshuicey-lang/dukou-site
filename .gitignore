@@ -1,0 +1,37 @@
+.env
+.env.*
+!.env.example
+
+conversations.json
+*.key
+*.pem
+
+记忆/
+backup/
+exports/
+raw_chats/
+.agents/
+
+# dependencies
+node_modules/
+
+# build output
+dist/
+build/
+.vite/
+
+# Windows / downloaded metadata
+*Zone.Identifier
+
+# public-copy privacy and build outputs
+*.log
+.DS_Store
+coverage/
+.cache/
+*.local
+conversations*.json
+chat*.json
+memory*.json
+notion*.json
+supabase*.json
+obsidian/
