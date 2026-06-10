@@ -1587,6 +1587,30 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
         replaceMessages(readMessages);
         window.requestAnimationFrame(() => scrollToBottom("auto"));
 
+        // If character was just unblocked, load stashed blocked-period messages
+        if (characterId && !isUserBlocked(characterId)) {
+          const stashed = loadStashedBlockedMessages();
+          if (stashed.length) {
+            for (const sm of stashed) {
+              const msg = makeUiMessage({
+                role: "assistant",
+                content: sm.content || "",
+                imageUrl: sm.imageUrl || "",
+                messageType: "text",
+                conversationId: chatSpaceId,
+                chatSpaceId,
+                meta: { ...sm.meta, blockedDuring: true },
+                created_at: sm.created_at,
+              });
+              appendMessage(msg);
+              if (persisted) {
+                await insertMessage(msg).catch(() => {});
+              }
+            }
+            window.requestAnimationFrame(() => scrollToBottom("auto"));
+          }
+        }
+
         if (chatSpaceId === "main" && !hasAssistantOpeningToday(readMessages)) {
           updateSessionStatus("waiting_model", chatSpaceId);
           const reply = await buildReplyParts({ opening: true, chatSpaceId, sourceMessages: readMessages });
@@ -2318,56 +2342,9 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
                 {verbosity === "long" ? "长篇" : "短句"}
               </button>
               {characterId && (
-                <>
-                  <button className="chat-icon-button" type="button" onClick={() => setCharacterSettingsOpen(true)} aria-label="角色模型设置">
-                    <SettingsIcon />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const nowBlocked = toggleUserBlock(characterId);
-                      setUserBlocked(nowBlocked);
-                      if (!nowBlocked) {
-                        // Just unblocked — load stashed messages
-                        const stashed = loadStashedBlockedMessages();
-                        if (stashed.length) {
-                          const cid = activeChatSpaceRef.current;
-                          const persisted = isPersistedChatSpace(cid);
-                          for (const sm of stashed) {
-                            const msg = makeUiMessage({
-                              role: "assistant",
-                              content: sm.content || "",
-                              imageUrl: sm.imageUrl || "",
-                              messageType: "text",
-                              conversationId: cid,
-                              chatSpaceId: cid,
-                              meta: { ...sm.meta, blockedDuring: true },
-                              created_at: sm.created_at,
-                            });
-                            appendMessage(msg);
-                            if (persisted) {
-                              await insertMessage(msg).catch(() => {});
-                            }
-                          }
-                          scrollToBottom("smooth");
-                        }
-                      }
-                    }}
-                    style={{
-                      fontSize: 10,
-                      color: userBlocked ? "#fff" : "var(--text-sub)",
-                      background: userBlocked ? "var(--danger)" : "var(--panel-soft-bg)",
-                      border: "1px solid var(--border-color)",
-                      padding: "2px 6px",
-                      borderRadius: 4,
-                      marginLeft: 4,
-                      cursor: "pointer",
-                      fontFamily: "inherit",
-                    }}
-                  >
-                    {userBlocked ? "已拉黑" : "拉黑"}
-                  </button>
-                </>
+                <button className="chat-icon-button" type="button" onClick={() => setCharacterSettingsOpen(true)} aria-label="角色模型设置">
+                  <SettingsIcon />
+                </button>
               )}
             </>
           )}
