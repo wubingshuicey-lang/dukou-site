@@ -1576,6 +1576,12 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
                 });
                 if (proactiveResult.ok && proactiveResult.text) {
                   window.localStorage.setItem(lastKey, String(Date.now()));
+                  // If character previously left/ended, they're back now
+                  const currentStatus = readChatStatus(chatSpaceId);
+                  if (currentStatus === "ended" || currentStatus === "away") {
+                    updateSessionStatus("idle", chatSpaceId);
+                    setSessionStatus("idle");
+                  }
                   const cleanProactive = proactiveResult.text.replace(/<image>[\s\S]*?(?:<\/image>|(?=<image>)|$)/gi, "").replace(/<say>[\s\S]*?<\/say>/gi, "").trim();
                   if (cleanProactive) {
                     const parts = splitToMessages(cleanProactive, settings.outputMode);
