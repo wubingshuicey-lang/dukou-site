@@ -1392,20 +1392,19 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
           : parsed.noReply && blockedNote
             ? "blocked"
             : "";
-    // Extract <image>prompt</image> before any text processing.
-    // These will be generated as separate image messages after text.
+    // Extract <image>prompt</image> from RAW text before stripSpecialTags eats them.
     // Handle both closed </image> and unclosed (next <image> or end-of-string) forms.
-    const rawTextForImage = stripSpecialTags(assistantQuote.text || "");
+    const rawText = assistantQuote.text || "";
     const imageRegex = /<image>([\s\S]*?)(?:<\/image>|(?=<image>)|$)/gi;
-    const stripRegex = /<image>[\s\S]*?(?:<\/image>|(?=<image>)|$)/gi;
     const imagePrompts = [];
     let imgMatch;
-    while ((imgMatch = imageRegex.exec(rawTextForImage)) !== null) {
+    while ((imgMatch = imageRegex.exec(rawText)) !== null) {
       const prompt = imgMatch[1].trim();
       if (prompt) imagePrompts.push(prompt);
     }
-    // Strip <image> tags (closed or unclosed) from the text so they don't appear in parts
-    let cleanText = rawTextForImage.replace(stripRegex, "").trim();
+    // stripSpecialTags now also removes <image> tags — text display is clean
+    let cleanText = stripSpecialTags(rawText);
+    const stripRegex = /<image>[\s\S]*?(?:<\/image>|(?=<image>)|$)/gi;
 
     // Pre-process <say>spoken</say> tags before splitToMessages, so tags never get
     // torn apart by punctuation splitting. Also keep backward compat with [voice].

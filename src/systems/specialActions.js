@@ -4,6 +4,7 @@ export function stripSpecialTags(text) {
     .replace(/<block_user>/g, "")
     .replace(/<unblock_user>/g, "")
     .replace(/<no_reply>/g, "")
+    .replace(/<image>[\s\S]*?(?:<\/image>|(?=<image>)|$)/gi, "")
     .trim();
 }
 
