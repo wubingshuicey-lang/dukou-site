@@ -27,7 +27,7 @@ export function normalizeModelError(error) {
   if (/network|fetch failed|failed to fetch/i.test(message)) {
     return { type: "network", message: "网络断了一下" };
   }
-  return { type: "unknown", message: "模型请求失败" };
+  return { type: "unknown", message: message || "模型请求失败" };
 }
 
 export async function callModel({ messages, systemPrompt, settings = getModelSettings(), signal }) {
