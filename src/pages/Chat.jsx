@@ -1157,7 +1157,26 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
         scrollToBottom("smooth");
       } catch (err) {
         setTyping(false);
-        setModelError({ type: "warn", message: `图片生成失败：${err.message || "未知错误"}` });
+        const errMsg = err.message || "未知错误";
+        const hint = errMsg.includes("404") || errMsg.includes("Not Found")
+          ? " — 中转站可能不支持 /images/generations 端点"
+          : errMsg.includes("401") || errMsg.includes("403")
+            ? " — API Key 无生图权限"
+            : "";
+        setModelError({ type: "warn", message: `图片生成失败：${errMsg}${hint}` });
+        // Also show as a chat bubble so it's visible on mobile
+        const errBubble = makeUiMessage({
+          role: "assistant",
+          content: `⚠️ 图片生成失败：${errMsg}${hint}`,
+          messageType: "text",
+          conversationId: chatSpaceId,
+          chatSpaceId,
+          meta: { source: "system_notice", chatSpaceId },
+        });
+        appendMessage(errBubble);
+        if (persist) {
+          await insertMessage(errBubble).catch(() => {});
+        }
       }
     }
   };
