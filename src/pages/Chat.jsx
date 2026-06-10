@@ -1450,7 +1450,7 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
           }
         }
       } else {
-        parts = splitToMessages(cleanText || assistantQuote.text, settings.outputMode);
+        parts = splitToMessages(cleanText, settings.outputMode);
       }
     } else {
       parts = splitToMessages(parsed.text.replace(stripRegex, "").trim(), settings.outputMode);
