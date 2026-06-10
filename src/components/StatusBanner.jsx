@@ -1,6 +1,6 @@
 export default function StatusBanner({ status, error }) {
   if (!status && !error) return null;
-  if ((status === "active" || status === "idle" || status === "waiting_model" || status === "typing" || status === "blocked") && !error) {
+  if ((status === "active" || status === "idle" || status === "waiting_model" || status === "typing") && !error) {
     return null;
   }
 
