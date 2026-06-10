@@ -1711,20 +1711,20 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
       const reply = await buildReplyParts({ userText: text, chatSpaceId });
       if (reply.parts.length) {
         await sendAssistantParts({ ...reply, chatSpaceId, persist, meta: { source: "model_or_fallback", chatSpaceId } });
-        // Generate images from <image> tags asynchronously
-        if (reply.imagePrompts?.length) {
-          generateImagesForReply(reply.imagePrompts, chatSpaceId, persist);
-        } else if (hasPhotoIntent(text)) {
-          // Fallback: AI didn't use <image> tag but user clearly wants a photo
-          generateImageFromContext(text, chatSpaceId, persist);
-        }
         if (chatSpaceId === "main") {
           await maybeTriggerRollingSummary(messagesRef.current, sessionIdRef.current);
         }
         maybeExtractMemories(chatSpaceId, messagesRef.current, characterModelSettings || getModelSettings());
         updateSessionStatus(reply.nextStatus || "idle", chatSpaceId);
       } else {
-        updateSessionStatus(reply.nextStatus || "failed", chatSpaceId);
+        updateSessionStatus(reply.nextStatus || "idle", chatSpaceId);
+      }
+
+      // Image generation runs regardless of text parts
+      if (reply.imagePrompts?.length) {
+        generateImagesForReply(reply.imagePrompts, chatSpaceId, persist);
+      } else if (hasPhotoIntent(text)) {
+        generateImageFromContext(text, chatSpaceId, persist);
       }
     } catch (error) {
       setModelError(normalizeModelError(error));
