@@ -915,7 +915,42 @@ function ModelSettingsPage({ settings, modelStatus, onBack, onRequestLeave, onSa
             <input className="settings-control" value={draft.baseUrl} onChange={(event) => updateDraft({ baseUrl: event.target.value })} />
           </Row>
           <Row label="Model">
-            <input className="settings-control" value={draft.model} onChange={(event) => updateDraft({ model: event.target.value })} />
+            <input
+              className="settings-control"
+              value={draft.model}
+              onChange={(event) => updateDraft({ model: event.target.value })}
+              placeholder="输入或选择模型名..."
+              list="model-suggestions"
+            />
+            <datalist id="model-suggestions">
+              <option value="gpt-4o" />
+              <option value="gpt-4o-mini" />
+              <option value="gpt-4.1" />
+              <option value="gpt-4-turbo" />
+              <option value="o4-mini" />
+              <option value="claude-sonnet-4-20250514" />
+              <option value="claude-3-5-sonnet-20241022" />
+              <option value="claude-3-5-haiku-20241022" />
+              <option value="claude-opus-4-20250514" />
+              <option value="deepseek-chat" />
+              <option value="deepseek-reasoner" />
+              <option value="gemini-2.5-flash" />
+              <option value="gemini-2.5-pro" />
+              <option value="gemini-2.0-flash" />
+              <option value="qwen-plus" />
+              <option value="qwen-max" />
+              <option value="qwen-turbo" />
+              <option value="glm-4-flash" />
+              <option value="glm-4-plus" />
+              <option value="moonshot-v1-8k" />
+              <option value="moonshot-v1-32k" />
+              <option value="hunyuan-turbo" />
+              <option value="hunyuan-pro" />
+              <option value="yi-large" />
+              <option value="yi-lightning" />
+              <option value="minimax-m1" />
+              <option value="openai/gpt-image-2" />
+            </datalist>
           </Row>
           <Row label="API Key" sub={apiKeyDisabled ? "Kiwi Local 不在前端保存真实模型 key" : ""}>
             <input
