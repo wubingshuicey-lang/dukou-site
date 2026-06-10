@@ -7,8 +7,11 @@ app.use("*", cors());
 
 // --- JWT helpers using Web Crypto ---
 
-const JWT_SECRET_KEY = "dukou-jwt-secret-change-me";
 const encoder = new TextEncoder();
+
+function getSecret(c) {
+  return c.env.JWT_SECRET || "dukou-jwt-secret-dev-only";
+}
 
 async function base64urlEncode(data) {
   const str = typeof data === "string" ? data : JSON.stringify(data);
@@ -18,14 +21,14 @@ async function base64urlEncode(data) {
     .replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 }
 
-async function signJWT(payload) {
+async function signJWT(payload, secret) {
   const header = { alg: "HS256", typ: "JWT" };
   const headerB64 = btoa(JSON.stringify(header)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
   const payloadB64 = btoa(JSON.stringify(payload)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
   const signingInput = `${headerB64}.${payloadB64}`;
 
   const key = await crypto.subtle.importKey(
-    "raw", encoder.encode(JWT_SECRET_KEY),
+    "raw", encoder.encode(secret),
     { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
   );
   const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(signingInput));
@@ -35,7 +38,7 @@ async function signJWT(payload) {
   return `${signingInput}.${sigB64}`;
 }
 
-async function verifyJWT(token) {
+async function verifyJWT(token, secret) {
   try {
     const parts = token.split(".");
     if (parts.length !== 3) return null;
@@ -43,7 +46,7 @@ async function verifyJWT(token) {
     const signingInput = `${headerB64}.${payloadB64}`;
 
     const key = await crypto.subtle.importKey(
-      "raw", encoder.encode(JWT_SECRET_KEY),
+      "raw", encoder.encode(secret),
       { name: "HMAC", hash: "SHA-256" }, false, ["verify"]
     );
     const sig = Uint8Array.from(
@@ -66,7 +69,8 @@ async function authMiddleware(c, next) {
   const auth = c.req.header("Authorization") || "";
   const token = auth.replace(/^Bearer\s+/i, "");
   if (!token) return c.json({ error: "未登录" }, 401);
-  const payload = await verifyJWT(token);
+  const secret = getSecret(c);
+  const payload = await verifyJWT(token, secret);
   if (!payload) return c.json({ error: "登录过期，请重新登录" }, 401);
   c.set("userId", payload.sub);
   c.set("username", payload.username);
@@ -88,12 +92,13 @@ app.post("/api/auth/register", async (c) => {
   const hash = await base64urlEncode(password + username);
   await db.prepare("INSERT INTO users (id, username, password_hash) VALUES (?, ?, ?)").bind(id, username, hash).run();
 
+  const secret = getSecret(c);
   const token = await signJWT({
     sub: id,
     username,
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor(Date.now() / 1000) + 86400 * 30,
-  });
+  }, secret);
 
   return c.json({ ok: true, token, user: { id, username } });
 });
@@ -109,12 +114,13 @@ app.post("/api/auth/login", async (c) => {
   const expectedHash = await base64urlEncode(password + username);
   if (user.password_hash !== expectedHash) return c.json({ error: "用户名或密码错误" }, 401);
 
+  const secret = getSecret(c);
   const token = await signJWT({
     sub: user.id,
     username: user.username,
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor(Date.now() / 1000) + 86400 * 30,
-  });
+  }, secret);
 
   return c.json({ ok: true, token, user: { id: user.id, username: user.username } });
 });
