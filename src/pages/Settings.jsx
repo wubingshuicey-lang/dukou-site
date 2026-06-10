@@ -32,6 +32,19 @@ const providerOptions = [
   ["custom_openai_compatible", "Custom"],
 ];
 
+const COMMON_MODELS = [
+  "gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4-turbo", "o4-mini",
+  "claude-sonnet-4-20250514", "claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022", "claude-opus-4-20250514",
+  "deepseek-chat", "deepseek-reasoner",
+  "gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash",
+  "qwen-plus", "qwen-max", "qwen-turbo",
+  "glm-4-flash", "glm-4-plus",
+  "moonshot-v1-8k", "moonshot-v1-32k",
+  "hunyuan-turbo", "hunyuan-pro",
+  "yi-large", "yi-lightning", "minimax-m1",
+  "openai/gpt-image-2",
+];
+
 const apiStyleOptions = ["openai_compatible", "anthropic"];
 const outputModeOptions = ["sentence", "paragraph"];
 const chatTransportOptions = ["mock", "direct_model", "kiwi_direct", "backend_gateway"];
@@ -915,42 +928,39 @@ function ModelSettingsPage({ settings, modelStatus, onBack, onRequestLeave, onSa
             <input className="settings-control" value={draft.baseUrl} onChange={(event) => updateDraft({ baseUrl: event.target.value })} />
           </Row>
           <Row label="Model">
-            <input
-              className="settings-control"
-              value={draft.model}
-              onChange={(event) => updateDraft({ model: event.target.value })}
-              placeholder="输入或选择模型名..."
-              list="model-suggestions"
-            />
-            <datalist id="model-suggestions">
-              <option value="gpt-4o" />
-              <option value="gpt-4o-mini" />
-              <option value="gpt-4.1" />
-              <option value="gpt-4-turbo" />
-              <option value="o4-mini" />
-              <option value="claude-sonnet-4-20250514" />
-              <option value="claude-3-5-sonnet-20241022" />
-              <option value="claude-3-5-haiku-20241022" />
-              <option value="claude-opus-4-20250514" />
-              <option value="deepseek-chat" />
-              <option value="deepseek-reasoner" />
-              <option value="gemini-2.5-flash" />
-              <option value="gemini-2.5-pro" />
-              <option value="gemini-2.0-flash" />
-              <option value="qwen-plus" />
-              <option value="qwen-max" />
-              <option value="qwen-turbo" />
-              <option value="glm-4-flash" />
-              <option value="glm-4-plus" />
-              <option value="moonshot-v1-8k" />
-              <option value="moonshot-v1-32k" />
-              <option value="hunyuan-turbo" />
-              <option value="hunyuan-pro" />
-              <option value="yi-large" />
-              <option value="yi-lightning" />
-              <option value="minimax-m1" />
-              <option value="openai/gpt-image-2" />
-            </datalist>
+            {(() => {
+              const isCustomModel = !COMMON_MODELS.includes(draft.model) && draft.model;
+              return (
+                <>
+                  <select
+                    className="settings-control"
+                    value={isCustomModel ? "__custom__" : draft.model}
+                    onChange={(event) => {
+                      if (event.target.value === "__custom__") {
+                        updateDraft({ model: "" });
+                      } else {
+                        updateDraft({ model: event.target.value });
+                      }
+                    }}
+                  >
+                    <option value="">-- 选择模型 --</option>
+                    {COMMON_MODELS.map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                    <option value="__custom__">其他（手动输入）</option>
+                  </select>
+                  {(isCustomModel || draft.model === "" && draft.provider) && (
+                    <input
+                      className="settings-control"
+                      style={{ marginTop: 6 }}
+                      value={draft.model}
+                      onChange={(event) => updateDraft({ model: event.target.value })}
+                      placeholder="输入模型 ID..."
+                    />
+                  )}
+                </>
+              );
+            })()}
           </Row>
           <Row label="API Key" sub={apiKeyDisabled ? "Kiwi Local 不在前端保存真实模型 key" : ""}>
             <input
