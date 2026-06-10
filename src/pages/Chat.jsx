@@ -1962,20 +1962,40 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
 
   // --- Voice / STT ---
 
-  const handleVoiceInput = async () => {
+  const voiceSessionRef = useRef(null);
+
+  const handleVoiceStart = async () => {
     if (voiceActive) return;
     setVoiceActive(true);
     setVoiceError("");
-    const { startListening } = await import("../services/sttService.js");
-    const result = await startListening();
-    if (result.text) {
-      setInput((prev) => prev + result.text);
-    }
-    if (result.error) {
-      setVoiceError(result.error);
+    try {
+      const { startListening } = await import("../services/sttService.js");
+      voiceSessionRef.current = startListening();
+    } catch (err) {
+      setVoiceActive(false);
+      setVoiceError("麦克风启动失败");
       setTimeout(() => setVoiceError(""), 3000);
     }
+  };
+
+  const handleVoiceStop = async () => {
+    if (!voiceActive || !voiceSessionRef.current) return;
+    const session = voiceSessionRef.current;
+    voiceSessionRef.current = null;
     setVoiceActive(false);
+    try {
+      const result = await session.stop();
+      if (result.text) {
+        setInput((prev) => (prev ? prev + " " + result.text : result.text));
+      }
+      if (result.error) {
+        setVoiceError(result.error);
+        setTimeout(() => setVoiceError(""), 4000);
+      }
+    } catch {
+      setVoiceError("语音识别失败");
+      setTimeout(() => setVoiceError(""), 3000);
+    }
   };
 
   // --- Voice / TTS ---
@@ -2467,7 +2487,8 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
         disabledLabel={inputDisabledLabel}
         placeholder={activeChatSpaceId === "model_test" ? "试一段模型语气..." : "说点什么..."}
         displayNames={displayNames}
-        onVoiceInput={handleVoiceInput}
+        onVoiceStart={handleVoiceStart}
+        onVoiceStop={handleVoiceStop}
         voiceEnabled={true}
         voiceActive={voiceActive}
         onImageSelect={setPendingImage}

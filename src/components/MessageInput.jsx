@@ -96,7 +96,8 @@ export default function MessageInput({
   disabledLabel = "机暂时离开了",
   placeholder = "说点什么...",
   displayNames = { assistant: "机", user: "我" },
-  onVoiceInput,
+  onVoiceStart,
+  onVoiceStop,
   voiceEnabled = false,
   voiceActive = false,
   onImageSelect,
@@ -136,12 +137,7 @@ export default function MessageInput({
       onSend();
       return;
     }
-
-    if (voiceEnabled && onVoiceInput) {
-      onVoiceInput();
-      return;
-    }
-
+    // Voice is now hold-to-talk via pointer events, not click-to-toggle
     selectTool('voice');
   };
 
@@ -204,12 +200,27 @@ export default function MessageInput({
         </div>
         <button
           className={'send-button' + (hasPendingContent ? '' : ' is-voice') + (voiceActive ? ' is-recording' : '')}
-          type='submit'
+          type={hasPendingContent ? 'submit' : 'button'}
           disabled={disabled}
-          aria-label={hasPendingContent ? '发送' : voiceEnabled ? '语音输入' : '发送语音'}
+          aria-label={hasPendingContent ? '发送' : '按住说话'}
           style={voiceActive ? { background: 'var(--danger)', animation: 'du-pulse 1s infinite' } : undefined}
+          onPointerDown={(e) => {
+            if (hasPendingContent || disabled) return;
+            e.preventDefault();
+            onVoiceStart?.();
+          }}
+          onPointerUp={(e) => {
+            if (hasPendingContent || disabled) return;
+            e.preventDefault();
+            onVoiceStop?.();
+          }}
+          onPointerLeave={(e) => {
+            if (hasPendingContent || disabled || !voiceActive) return;
+            e.preventDefault();
+            onVoiceStop?.();
+          }}
         >
-          {hasPendingContent ? <SendIcon /> : voiceEnabled ? (voiceActive ? <span style={{fontSize:10}}>■</span> : <VoiceIcon />) : <VoiceIcon />}
+          {hasPendingContent ? <SendIcon /> : voiceActive ? <span style={{fontSize:10,pointerEvents:'none'}}>■</span> : <VoiceIcon />}
         </button>
       </form>
       {toolsOpen && (
