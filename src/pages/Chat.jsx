@@ -1137,7 +1137,7 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
         setTyping(true);
         const imageUrl = await generateImage({
           prompt,
-          settings: { ...settings, imageModel: "openai/gpt-image-2" },
+          settings,
         });
         setTyping(false);
 

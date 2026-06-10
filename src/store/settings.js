@@ -76,6 +76,11 @@ export const DEFAULT_MODEL_SETTINGS = {
   apiKey: "",
   baseUrl: "https://api.deepseek.com",
   model: "deepseek-chat",
+  // Per-capability model overrides: if empty, falls back to `model`
+  chatModel: "",
+  imageModel: "openai/gpt-image-2",
+  sttModel: "whisper-1",
+  ttsModel: "tts-1",
   temperature: 0.8,
   maxTokens: 1000,
   outputMode: "sentence",

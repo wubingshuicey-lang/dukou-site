@@ -48,7 +48,8 @@ async function transcribeViaApi(blob) {
   const ext = (blob.type || "").includes("mp4") ? "mp4" : "webm";
   const fd = new FormData();
   fd.append("file", blob, `recording.${ext}`);
-  fd.append("model", "whisper-1");
+  const sttModel = settings.sttModel || "whisper-1";
+  fd.append("model", sttModel);
   fd.append("language", "zh");
 
   const resp = await fetch(`${baseUrl}/audio/transcriptions`, {

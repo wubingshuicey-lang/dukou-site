@@ -395,5 +395,7 @@ export function getCharacterModelSettings(charId) {
     apiKey: char.modelApiKey || "",
     baseUrl: char.modelBaseUrl || provider.baseUrl,
     model: char.modelName || provider.defaultModel,
+    imageModel: char.imageModel || "",
+    ttsModel: char.ttsModel || "",
   };
 }

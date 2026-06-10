@@ -24,7 +24,7 @@ export async function generateImage({ prompt, settings, signal }) {
       Authorization: `Bearer ${settings.apiKey}`,
     },
     body: JSON.stringify({
-      model: settings.imageModel || "openai/gpt-image-2",
+      model: settings.imageModel || settings.model || "openai/gpt-image-2",
       prompt,
       n: 1,
       size: "1024x1024",

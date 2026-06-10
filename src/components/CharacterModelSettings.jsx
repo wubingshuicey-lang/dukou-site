@@ -31,6 +31,8 @@ export default function CharacterModelSettings({ characterId, onSaved, onClose }
   const [apiKey, setApiKey] = useState(char?.modelApiKey || "");
   const [modelName, setModelName] = useState(char?.modelName || "");
   const [baseUrl, setBaseUrl] = useState(char?.modelBaseUrl || "");
+  const [imageModel, setImageModel] = useState(char?.imageModel || "");
+  const [ttsModel, setTtsModel] = useState(char?.ttsModel || "");
   const [elevenlabsApiKey, setElevenlabsApiKey] = useState(char?.elevenlabsApiKey || "");
   const [voiceId, setVoiceId] = useState(char?.voiceId || "");
   const [voiceMode, setVoiceMode] = useState(char?.voiceMode || "off");
@@ -139,6 +141,8 @@ export default function CharacterModelSettings({ characterId, onSaved, onClose }
       modelApiKey: apiKey,
       modelName: modelName,
       modelBaseUrl: baseUrl,
+      imageModel,
+      ttsModel,
       elevenlabsApiKey,
       voiceId,
       voiceMode,
@@ -210,14 +214,37 @@ export default function CharacterModelSettings({ characterId, onSaved, onClose }
 
             {needsModelName && (
               <div className="charm-field">
-                <label className="charm-label">模型名称</label>
+                <label className="charm-label">聊天模型</label>
                 <input
                   className="charm-input"
-                  placeholder="输入模型 ID"
+                  placeholder="对话用的模型，如 gpt-4o"
                   value={modelName}
                   onChange={(e) => setModelName(e.target.value)}
                 />
               </div>
+            )}
+
+            {provider && (
+              <>
+                <div className="charm-field">
+                  <label className="charm-label">生图模型</label>
+                  <input
+                    className="charm-input"
+                    placeholder="如 openai/gpt-image-2，留空不启用"
+                    value={imageModel}
+                    onChange={(e) => setImageModel(e.target.value)}
+                  />
+                </div>
+                <div className="charm-field">
+                  <label className="charm-label">TTS 模型</label>
+                  <input
+                    className="charm-input"
+                    placeholder="语音播报模型，如 tts-1"
+                    value={ttsModel}
+                    onChange={(e) => setTtsModel(e.target.value)}
+                  />
+                </div>
+              </>
             )}
 
             <div className="charm-field">

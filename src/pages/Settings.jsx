@@ -957,6 +957,50 @@ function ModelSettingsPage({ settings, modelStatus, onBack, onRequestLeave, onSa
               )}
             </div>
           </Row>
+          {draft.provider && draft.provider !== "kiwi_local" && (
+            <Section title="模型路由（不同任务自动用不同模型）">
+              <Row label="生图模型">
+                <select
+                  className="settings-control"
+                  value={draft.imageModel || ""}
+                  onChange={(e) => updateDraft({ imageModel: e.target.value })}
+                >
+                  <option value="">-- 跟随聊天模型 --</option>
+                  <option value="openai/gpt-image-2">openai/gpt-image-2</option>
+                  <option value="openai/gpt-image-1.5">openai/gpt-image-1.5</option>
+                  {COMMON_MODELS.filter(m => m.includes("image") || m.includes("dall-e")).map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                  <option value="__custom__">其他（下方输入）</option>
+                </select>
+                {draft.imageModel && !["openai/gpt-image-2", "openai/gpt-image-1.5"].includes(draft.imageModel) && !COMMON_MODELS.includes(draft.imageModel) && (
+                  <input
+                    className="settings-control"
+                    style={{ marginTop: 4 }}
+                    value={draft.imageModel}
+                    onChange={(e) => updateDraft({ imageModel: e.target.value })}
+                    placeholder="输入生图模型 ID..."
+                  />
+                )}
+              </Row>
+              <Row label="语音转文字模型">
+                <input
+                  className="settings-control"
+                  value={draft.sttModel || ""}
+                  onChange={(e) => updateDraft({ sttModel: e.target.value })}
+                  placeholder="默认 whisper-1，留空跟随聊天模型"
+                />
+              </Row>
+              <Row label="语音播报模型">
+                <input
+                  className="settings-control"
+                  value={draft.ttsModel || ""}
+                  onChange={(e) => updateDraft({ ttsModel: e.target.value })}
+                  placeholder="默认 tts-1，留空跟随聊天模型"
+                />
+              </Row>
+            </Section>
+          )}
           <Row label="API Key" sub={apiKeyDisabled ? "Kiwi Local 不在前端保存真实模型 key" : ""}>
             <input
               className="settings-control"
