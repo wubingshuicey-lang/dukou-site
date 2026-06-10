@@ -34,16 +34,17 @@ const providerOptions = [
 ];
 
 const COMMON_MODELS = [
-  "gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4-turbo", "o4-mini",
-  "claude-sonnet-4-20250514", "claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022", "claude-opus-4-20250514",
-  "deepseek-chat", "deepseek-reasoner",
-  "gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash",
+  "gpt-5", "gpt-5.4", "gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4-turbo", "o3", "o4-mini",
+  "claude-opus-4-8-20250514", "claude-sonnet-4-7-20250514", "claude-sonnet-4-6-20250514", "claude-haiku-4-5-20250514",
+  "claude-sonnet-4-20250514", "claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022",
+  "deepseek-chat", "deepseek-reasoner", "deepseek-v4",
+  "gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", "gemini-3.5-flash",
   "qwen-plus", "qwen-max", "qwen-turbo",
   "glm-4-flash", "glm-4-plus",
   "moonshot-v1-8k", "moonshot-v1-32k",
   "hunyuan-turbo", "hunyuan-pro",
   "yi-large", "yi-lightning", "minimax-m1",
-  "openai/gpt-image-2",
+  "openai/gpt-image-2", "openai/gpt-image-1.5",
 ];
 
 const apiStyleOptions = ["openai_compatible", "anthropic"];
