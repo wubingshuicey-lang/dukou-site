@@ -1158,11 +1158,12 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
       } catch (err) {
         setTyping(false);
         const errMsg = err.message || "未知错误";
+        const calledUrl = `${(settings.baseUrl || "").replace(/\/+$/, "")}/images/generations`;
         const hint = errMsg.includes("404") || errMsg.includes("Not Found")
-          ? " — 中转站可能不支持 /images/generations 端点"
+          ? ` — 端点不存在，请求了 ${calledUrl}`
           : errMsg.includes("401") || errMsg.includes("403")
             ? " — API Key 无生图权限"
-            : "";
+            : ` — 请求了 ${calledUrl}`;
         setModelError({ type: "warn", message: `图片生成失败：${errMsg}${hint}` });
         // Also show as a chat bubble so it's visible on mobile
         const errBubble = makeUiMessage({
