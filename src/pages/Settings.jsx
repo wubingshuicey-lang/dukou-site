@@ -1996,13 +1996,13 @@ function ElevenLabsSettingsPage({ settings, onBack, onRequestLeave, onSave, show
     setTesting(true);
     setTtsResult(null);
 
-    if (!draft.apiKey) {
+    if (!isOpenai && !draft.apiKey) {
       setTtsResult({ ok: false, text: "请先填写 API Key" });
       setTesting(false);
       return;
     }
     if (!draft.voiceId) {
-      setTtsResult({ ok: false, text: "请先填写 Voice ID" });
+      setTtsResult({ ok: false, text: "请先选择声音" });
       setTesting(false);
       return;
     }
@@ -2011,7 +2011,10 @@ function ElevenLabsSettingsPage({ settings, onBack, onRequestLeave, onSave, show
       const { speak } = await import("../services/voiceService.js");
       const { stopSpeaking } = await import("../services/voiceService.js");
       stopSpeaking();
-      const result = await speak("你好，这是渡口的语音测试。", { apiKey: draft.apiKey, voiceId: draft.voiceId });
+      const speakOpts = isOpenai
+        ? { provider: "openai", voiceId: draft.voiceId }
+        : { apiKey: draft.apiKey, voiceId: draft.voiceId };
+      const result = await speak("你好，这是渡口的语音测试。", speakOpts);
       if (result?.error) {
         setTtsResult({ ok: false, text: result.error });
       } else {
@@ -2023,29 +2026,80 @@ function ElevenLabsSettingsPage({ settings, onBack, onRequestLeave, onSave, show
     setTesting(false);
   }
 
+  const isOpenai = draft.provider === "openai";
+  const OPENAI_VOICES = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"];
+
   return (
     <>
-      <SubHeader title="ElevenLabs 语音" onBack={() => onRequestLeave(dirty, onBack)} actionLabel="保存" onAction={save} />
+      <SubHeader title="语音 (TTS)" onBack={() => onRequestLeave(dirty, onBack)} actionLabel="保存" onAction={save} />
       <div className="settings-scroll">
-        <InlineNotice>ElevenLabs 用于角色 TTS 语音播报。API Key 只保存在本浏览器，不经过后端。</InlineNotice>
+        <InlineNotice>
+          {isOpenai
+            ? "OpenAI TTS 走全局 LLM 的 API Key + Base URL，无需额外配置。"
+            : "ElevenLabs TTS，API Key 只保存在本浏览器。"}
+        </InlineNotice>
         <Section title="接入">
-          <Row label="API Key">
-            <input
-              className="settings-control"
-              type="password"
-              value={draft.apiKey || ""}
-              onChange={(e) => updateDraft({ apiKey: e.target.value })}
-              placeholder="sk_..."
-            />
+          <Row label="TTS Provider">
+            <select className="settings-control" value={draft.provider || "elevenlabs"} onChange={(e) => updateDraft({ provider: e.target.value })}>
+              <option value="elevenlabs">ElevenLabs</option>
+              <option value="openai">OpenAI TTS (中转站)</option>
+            </select>
           </Row>
-          <Row label="默认 Voice ID">
-            <input
-              className="settings-control"
-              value={draft.voiceId || ""}
-              onChange={(e) => updateDraft({ voiceId: e.target.value })}
-              placeholder="角色可单独覆盖"
-            />
-          </Row>
+          {isOpenai ? (
+            <>
+              <Row label="模型">
+                <select className="settings-control" value={draft.openaiModel || "tts-1"} onChange={(e) => updateDraft({ openaiModel: e.target.value })}>
+                  <option value="tts-1">tts-1</option>
+                  <option value="tts-1-hd">tts-1-hd</option>
+                </select>
+              </Row>
+              <Row label="默认声音">
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {OPENAI_VOICES.map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      className={`charm-chip ${draft.voiceId === v ? "selected" : ""}`}
+                      onClick={() => updateDraft({ voiceId: v })}
+                    >
+                      {v}
+                    </button>
+                  ))}
+                </div>
+              </Row>
+              <Row label="语速" sub={String(draft.speed ?? 1.0)}>
+                <input
+                  className="settings-control"
+                  type="range"
+                  min="0.25"
+                  max="4"
+                  step="0.05"
+                  value={draft.speed ?? 1.0}
+                  onChange={(e) => updateDraft({ speed: Number(e.target.value) })}
+                />
+              </Row>
+            </>
+          ) : (
+            <>
+              <Row label="API Key">
+                <input
+                  className="settings-control"
+                  type="password"
+                  value={draft.apiKey || ""}
+                  onChange={(e) => updateDraft({ apiKey: e.target.value })}
+                  placeholder="sk_..."
+                />
+              </Row>
+              <Row label="默认 Voice ID">
+                <input
+                  className="settings-control"
+                  value={draft.voiceId || ""}
+                  onChange={(e) => updateDraft({ voiceId: e.target.value })}
+                  placeholder="角色可单独覆盖"
+                />
+              </Row>
+            </>
+          )}
           <Row label="">
             <button
               className="charm-test-btn"
@@ -2062,30 +2116,32 @@ function ElevenLabsSettingsPage({ settings, onBack, onRequestLeave, onSave, show
             )}
           </Row>
         </Section>
-        <Section title="语音参数">
-          <Row label="Stability" sub={String(draft.stability ?? 0.5)}>
-            <input
-              className="settings-control"
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              value={draft.stability ?? 0.5}
-              onChange={(e) => updateDraft({ stability: Number(e.target.value) })}
-            />
-          </Row>
-          <Row label="Similarity Boost" sub={String(draft.similarityBoost ?? 0.75)}>
-            <input
-              className="settings-control"
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              value={draft.similarityBoost ?? 0.75}
-              onChange={(e) => updateDraft({ similarityBoost: Number(e.target.value) })}
-            />
-          </Row>
-        </Section>
+        {!isOpenai && (
+          <Section title="ElevenLabs 参数">
+            <Row label="Stability" sub={String(draft.stability ?? 0.5)}>
+              <input
+                className="settings-control"
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={draft.stability ?? 0.5}
+                onChange={(e) => updateDraft({ stability: Number(e.target.value) })}
+              />
+            </Row>
+            <Row label="Similarity Boost" sub={String(draft.similarityBoost ?? 0.75)}>
+              <input
+                className="settings-control"
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={draft.similarityBoost ?? 0.75}
+                onChange={(e) => updateDraft({ similarityBoost: Number(e.target.value) })}
+              />
+            </Row>
+          </Section>
+        )}
       </div>
     </>
   );

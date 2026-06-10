@@ -1,41 +1,65 @@
-import { getElevenlabsSettings } from "../store/settings.js";
-import { textToSpeech } from "../api/providers/elevenlabs.js";
+import { getElevenlabsSettings, getModelSettings } from "../store/settings.js";
+import { textToSpeech as elevenlabsTts } from "../api/providers/elevenlabs.js";
+import { openaiTextToSpeech } from "../api/providers/openaiTts.js";
 
 let currentAudio = null;
 let currentAbort = null;
 
 /**
- * Speak text using ElevenLabs TTS.
+ * Speak text using configured TTS provider.
+ * Supports: ElevenLabs, OpenAI TTS (/audio/speech), or any OpenAI-compatible TTS.
  * Auto-stops any currently playing audio.
- * @param {string} text
- * @param {object} [overrides]
- * @param {string} [overrides.voiceId] - Override the default voice ID
- * @param {string} [overrides.apiKey]
  */
 export async function speak(text, overrides = {}) {
-  // Stop any current playback
   stopSpeaking();
-
-  const settings = getElevenlabsSettings();
-  const apiKey = overrides.apiKey || settings.apiKey;
-  const voiceId = overrides.voiceId || settings.voiceId;
-
-  if (!apiKey || !voiceId) {
-    console.warn("ElevenLabs: 缺少 API Key 或 Voice ID，请在设置中配置");
-    return { error: "请先在设置中配置 ElevenLabs API Key 和 Voice ID" };
-  }
 
   const controller = new AbortController();
   currentAbort = controller;
 
-  const result = await textToSpeech({
-    text,
-    apiKey,
-    voiceId,
-    stability: settings.stability,
-    similarityBoost: settings.similarityBoost,
-    signal: controller.signal,
-  });
+  // Determine provider: if ElevenLabs settings have apiKey, use that; otherwise try OpenAI TTS
+  const elevenSettings = getElevenlabsSettings();
+  const modelSettings = getModelSettings();
+
+  const ttsProvider = overrides.provider || elevenSettings.provider || "elevenlabs";
+  let result;
+
+  if (ttsProvider === "openai") {
+    // OpenAI-compatible TTS: uses global LLM settings (key + baseUrl)
+    const apiKey = overrides.apiKey || modelSettings.apiKey;
+    const baseUrl = overrides.baseUrl || modelSettings.baseUrl;
+    const voiceId = overrides.voiceId || elevenSettings.voiceId || "alloy";
+
+    if (!apiKey) {
+      return { error: "请先在设置里填写 API Key" };
+    }
+
+    result = await openaiTextToSpeech({
+      text,
+      apiKey,
+      baseUrl,
+      voiceId,
+      model: elevenSettings.openaiModel || "tts-1",
+      speed: elevenSettings.speed || 1.0,
+      signal: controller.signal,
+    });
+  } else {
+    // ElevenLabs (default)
+    const apiKey = overrides.apiKey || elevenSettings.apiKey;
+    const voiceId = overrides.voiceId || elevenSettings.voiceId;
+
+    if (!apiKey || !voiceId) {
+      return { error: "请先在设置中配置 ElevenLabs API Key 和 Voice ID" };
+    }
+
+    result = await elevenlabsTts({
+      text,
+      apiKey,
+      voiceId,
+      stability: elevenSettings.stability,
+      similarityBoost: elevenSettings.similarityBoost,
+      signal: controller.signal,
+    });
+  }
 
   if (result.error) {
     currentAbort = null;

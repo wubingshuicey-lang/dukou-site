@@ -99,11 +99,14 @@ export const DEFAULT_PROMPT_SETTINGS = {
 };
 
 export const DEFAULT_ELEVENLABS_SETTINGS = {
+  provider: "elevenlabs", // "elevenlabs" | "openai"
   apiKey: "",
   voiceId: "",
   autoPlay: false,
   stability: 0.5,
   similarityBoost: 0.75,
+  openaiModel: "tts-1", // for OpenAI TTS: tts-1 or tts-1-hd
+  speed: 1.0,
 };
 
 export const DEFAULT_UI_SETTINGS = {
