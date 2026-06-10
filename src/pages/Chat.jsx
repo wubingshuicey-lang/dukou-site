@@ -1550,6 +1550,57 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
           }
           updateSessionStatus(reply.nextStatus || "idle", chatSpaceId);
         }
+
+        // Proactive messages for character spaces: character initiates based on time + background
+        if (chatSpaceId.startsWith("char_") && readMessages.length > 0) {
+          const lastKey = `dukou:lastProactive:${chatSpaceId}`;
+          const lastProactive = window.localStorage.getItem(lastKey);
+          const cooldownHours = 2;
+          const shouldProactive = !lastProactive || (Date.now() - Number(lastProactive)) > cooldownHours * 3600 * 1000;
+          if (shouldProactive) {
+            const settings = characterModelSettings || getModelSettings();
+            if (settings.apiKey) {
+              try {
+                const now = new Date();
+                const timeStr = now.toLocaleString("zh-CN", { hour12: false });
+                const hour = now.getHours();
+                const timeOfDay = hour < 6 ? "凌晨" : hour < 9 ? "清晨" : hour < 12 ? "上午" : hour < 14 ? "中午" : hour < 18 ? "下午" : hour < 22 ? "晚上" : "深夜";
+                const recentConvo = readMessages.slice(-6).map(m => `${m.role === "user" ? "对方" : "你"}: ${String(m.content || "").slice(0, 40)}`).join("\n");
+                const proactiveResult = await callModel({
+                  messages: [{
+                    role: "user",
+                    content: `现在是${timeStr}（${timeOfDay}）。根据你的人设和当前时间，主动给对方发一条短消息。可以分享你正在做的事、一个随感、或者一个自然的问候。不要问好，不超过30字，像真实聊天一样自然。\n\n最近的对话：\n${recentConvo}`,
+                  }],
+                  systemPrompt: `你是${characterName || "一个角色"}。${characterPersonality ? `性格：${characterPersonality}` : ""}${characterBackstory ? `\n背景：${characterBackstory}` : ""}\n说话自然，有人情味。只输出你要说的话，不加任何前缀、说明或标签。`,
+                  settings,
+                });
+                if (proactiveResult.ok && proactiveResult.text) {
+                  window.localStorage.setItem(lastKey, String(Date.now()));
+                  const cleanProactive = proactiveResult.text.replace(/<image>[\s\S]*?(?:<\/image>|(?=<image>)|$)/gi, "").replace(/<say>[\s\S]*?<\/say>/gi, "").trim();
+                  if (cleanProactive) {
+                    const parts = splitToMessages(cleanProactive, settings.outputMode);
+                    for (const part of parts) {
+                      if (!part) continue;
+                      const msg = makeUiMessage({
+                        role: "assistant",
+                        content: part,
+                        messageType: "text",
+                        conversationId: chatSpaceId,
+                        chatSpaceId,
+                        meta: { source: "proactive", chatSpaceId },
+                      });
+                      appendMessage(msg);
+                      await insertMessage(msg);
+                      await sleep(420);
+                    }
+                  }
+                }
+              } catch {
+                // proactive messages are best-effort
+              }
+            }
+          }
+        }
       } catch (error) {
         setTyping(false);
         setModelError(normalizeModelError(error));
