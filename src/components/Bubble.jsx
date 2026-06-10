@@ -147,6 +147,7 @@ export default function Bubble({
   const reasoningContent = canShowReasoning(message, isUser) ? String(message.reasoningContent || "") : "";
   const isAiGenerated = message.meta?.source === "ai_generated";
   const isSavedToGallery = message.meta?.savedToGallery;
+  const wasBlockedDuring = message.meta?.blockedDuring;
   const hasMoreActions = !readOnly && !selectable && moreActions.length > 0;
   const [moreOpen, setMoreOpen] = useState(false);
   const longPressTimerRef = useRef(null);
@@ -323,6 +324,7 @@ export default function Bubble({
         </div>
         <div className="bubble-meta">
           <span>{formatTime(message.created_at)}</span>
+          {wasBlockedDuring && <span style={{ color: "var(--danger)", fontWeight: 600 }}>❗ 被拉黑期间发送</span>}
           {isBlockedFailed && <span className="is-failed">未送达</span>}
           {isBlockedNote && <span>小纸条</span>}
           {isUser && !isBlockedFailed && !isBlockedNote && (

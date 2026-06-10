@@ -399,3 +399,31 @@ export function getCharacterModelSettings(charId) {
     ttsModel: char.ttsModel || "",
   };
 }
+
+// --- User-initiated block ---
+
+const BLOCKED_KEY = "dukou:userBlockedChars";
+
+function readBlockedChars() {
+  try { return JSON.parse(localStorage.getItem(BLOCKED_KEY) || "[]"); } catch { return []; }
+}
+function writeBlockedChars(ids) {
+  try { localStorage.setItem(BLOCKED_KEY, JSON.stringify(ids)); } catch {}
+}
+
+export function isUserBlocked(charId) {
+  return readBlockedChars().includes(charId);
+}
+
+export function toggleUserBlock(charId) {
+  const list = readBlockedChars();
+  const idx = list.indexOf(charId);
+  if (idx >= 0) list.splice(idx, 1);
+  else list.push(charId);
+  writeBlockedChars(list);
+  return idx < 0; // true = now blocked, false = unblocked
+}
+
+export function getBlockedCharIds() {
+  return readBlockedChars();
+}

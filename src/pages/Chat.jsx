@@ -19,6 +19,7 @@ import { callModel, normalizeModelError } from "../api/modelClient.js";
 import { generateImage } from "../api/providers/imageGeneration.js";
 import { getMemorySettings, getModelSettings, getPromptSettings, getSettings, getTransportSettings } from "../store/settings.js";
 import { addMemories, getRecentMemories } from "../store/characterMemory.js";
+import { toggleUserBlock, isUserBlocked } from "../store/characters.js";
 import { searchMemories } from "../systems/memorySearch.js";
 import { saveContextSnapshot, updateContextSnapshot } from "../store/contextLogs.js";
 import { getSessionId } from "../store/session.js";
@@ -844,6 +845,29 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
   const [showScrollBottom, setShowScrollBottom] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState(null);
   const [characterSettingsOpen, setCharacterSettingsOpen] = useState(false);
+  const [userBlocked, setUserBlocked] = useState(
+    () => characterId ? isUserBlocked(characterId) : false
+  );
+
+  // Stash messages sent while user-blocked, restore on unblock
+  const BLOCKED_MSG_KEY = `dukou:blockedMsgs:${characterId || ""}`;
+
+  const stashBlockedMessage = (msg) => {
+    try {
+      const list = JSON.parse(localStorage.getItem(BLOCKED_MSG_KEY) || "[]");
+      list.push(msg);
+      localStorage.setItem(BLOCKED_MSG_KEY, JSON.stringify(list));
+    } catch {}
+  };
+
+  const loadStashedBlockedMessages = () => {
+    try {
+      const raw = localStorage.getItem(BLOCKED_MSG_KEY);
+      if (!raw) return [];
+      localStorage.removeItem(BLOCKED_MSG_KEY);
+      return JSON.parse(raw);
+    } catch { return []; }
+  };
   const [pendingImage, setPendingImage] = useState("");
   const [verbosity, setVerbosity] = useState(() => {
     if (typeof window !== "undefined") {
@@ -1601,19 +1625,27 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
                   const cleanProactive = proactiveResult.text.replace(/<image>[\s\S]*?(?:<\/image>|(?=<image>)|$)/gi, "").replace(/<say>[\s\S]*?<\/say>/gi, "").trim();
                   if (cleanProactive) {
                     const parts = splitToMessages(cleanProactive, settings.outputMode);
+                    const blocked = isUserBlocked(characterId);
                     for (const part of parts) {
                       if (!part) continue;
-                      const msg = makeUiMessage({
+                      const msgData = {
                         role: "assistant",
                         content: part,
                         messageType: "text",
                         conversationId: chatSpaceId,
                         chatSpaceId,
                         meta: { source: "proactive", chatSpaceId },
-                      });
-                      appendMessage(msg);
-                      await insertMessage(msg);
-                      await sleep(420);
+                        created_at: new Date().toISOString(),
+                      };
+                      if (blocked) {
+                        // Stash for later — don't display while blocked
+                        stashBlockedMessage(msgData);
+                      } else {
+                        const msg = makeUiMessage(msgData);
+                        appendMessage(msg);
+                        await insertMessage(msg);
+                        await sleep(420);
+                      }
                     }
                   }
                 }
@@ -2152,8 +2184,10 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
   const hasEmotionUpdate = hasUnreadEmotionChange(affordanceState);
   const activeChatSpace = getChatSpaceMeta(activeChatSpaceId);
   const headerStatusText = getHeaderStatusText({ typing, isSending, status: sessionStatus, assistantName: displayNames.assistant });
-  const inputDisabled = typing || isSending || ["away", "ended"].includes(sessionStatus) || Boolean(editingUserMessage);
-  const inputDisabledLabel = editingUserMessage
+  const inputDisabled = typing || isSending || userBlocked || ["away", "ended"].includes(sessionStatus) || Boolean(editingUserMessage);
+  const inputDisabledLabel = userBlocked
+    ? "已拉黑，无法发送消息"
+    : editingUserMessage
     ? "正在重新编辑上一条消息"
     : getInputDisabledLabel({ typing, isSending, status: sessionStatus, assistantName: displayNames.assistant });
   const lastActionableMessageId = [...grouped].reverse().find((message) => !isLocalBlockedMessage(message))?.id || "";
@@ -2278,9 +2312,56 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
                 {verbosity === "long" ? "长篇" : "短句"}
               </button>
               {characterId && (
-                <button className="chat-icon-button" type="button" onClick={() => setCharacterSettingsOpen(true)} aria-label="角色模型设置">
-                  <SettingsIcon />
-                </button>
+                <>
+                  <button className="chat-icon-button" type="button" onClick={() => setCharacterSettingsOpen(true)} aria-label="角色模型设置">
+                    <SettingsIcon />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const nowBlocked = toggleUserBlock(characterId);
+                      setUserBlocked(nowBlocked);
+                      if (!nowBlocked) {
+                        // Just unblocked — load stashed messages
+                        const stashed = loadStashedBlockedMessages();
+                        if (stashed.length) {
+                          const cid = activeChatSpaceRef.current;
+                          const persisted = isPersistedChatSpace(cid);
+                          for (const sm of stashed) {
+                            const msg = makeUiMessage({
+                              role: "assistant",
+                              content: sm.content || "",
+                              imageUrl: sm.imageUrl || "",
+                              messageType: "text",
+                              conversationId: cid,
+                              chatSpaceId: cid,
+                              meta: { ...sm.meta, blockedDuring: true },
+                              created_at: sm.created_at,
+                            });
+                            appendMessage(msg);
+                            if (persisted) {
+                              await insertMessage(msg).catch(() => {});
+                            }
+                          }
+                          scrollToBottom("smooth");
+                        }
+                      }
+                    }}
+                    style={{
+                      fontSize: 10,
+                      color: userBlocked ? "#fff" : "var(--text-sub)",
+                      background: userBlocked ? "var(--danger)" : "var(--panel-soft-bg)",
+                      border: "1px solid var(--border-color)",
+                      padding: "2px 6px",
+                      borderRadius: 4,
+                      marginLeft: 4,
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    {userBlocked ? "已拉黑" : "拉黑"}
+                  </button>
+                </>
               )}
             </>
           )}
