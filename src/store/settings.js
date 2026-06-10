@@ -1,3 +1,5 @@
+import { isLoggedIn, fetchSettings, pushSettings } from "../api/apiClient.js";
+
 const LEGACY_SETTINGS_KEY = "dukou:settings";
 
 export const STORAGE_KEYS = {
@@ -6,6 +8,7 @@ export const STORAGE_KEYS = {
   memorySettings: "dukou:memorySettings",
   transportSettings: "dukou:transportSettings",
   promptSettings: "dukou:promptSettings",
+  elevenlabsSettings: "dukou:elevenlabsSettings",
   contextLogs: "dukou:contextLogs",
   localUserId: "dukou:localUserId",
 };
@@ -89,6 +92,14 @@ export const DEFAULT_PROMPT_SETTINGS = {
   customSystemPrompt: "",
 };
 
+export const DEFAULT_ELEVENLABS_SETTINGS = {
+  apiKey: "",
+  voiceId: "",
+  autoPlay: false,
+  stability: 0.5,
+  similarityBoost: 0.75,
+};
+
 export const DEFAULT_UI_SETTINGS = {
   theme: "light",
   duName: "机",
@@ -118,6 +129,7 @@ export const DEFAULT_SETTINGS = {
   ui: DEFAULT_UI_SETTINGS,
   transport: DEFAULT_TRANSPORT_SETTINGS,
   prompt: DEFAULT_PROMPT_SETTINGS,
+  elevenlabs: DEFAULT_ELEVENLABS_SETTINGS,
 };
 
 function canUseLocalStorage() {
@@ -276,6 +288,13 @@ function mergeUiSettings(value) {
   return ui;
 }
 
+function mergeElevenlabsSettings(value) {
+  return {
+    ...DEFAULT_ELEVENLABS_SETTINGS,
+    ...(value || {}),
+  };
+}
+
 function mergeSettings(value) {
   return {
     model: mergeModelSettings(value?.model),
@@ -283,6 +302,7 @@ function mergeSettings(value) {
     transport: mergeTransportSettings(value?.transport, value?.memory),
     ui: mergeUiSettings(value?.ui),
     prompt: mergePromptSettings(value?.prompt),
+    elevenlabs: mergeElevenlabsSettings(value?.elevenlabs),
   };
 }
 
@@ -297,6 +317,7 @@ function persistSplitSettings(settings) {
   writeJson(STORAGE_KEYS.transportSettings, settings.transport);
   writeJson(STORAGE_KEYS.uiSettings, settings.ui);
   writeJson(STORAGE_KEYS.promptSettings, settings.prompt);
+  writeJson(STORAGE_KEYS.elevenlabsSettings, settings.elevenlabs);
   removeItem(LEGACY_SETTINGS_KEY);
 }
 
@@ -310,6 +331,7 @@ export function getSettings() {
     transport: readJson(STORAGE_KEYS.transportSettings),
     ui: readJson(STORAGE_KEYS.uiSettings),
     prompt: readJson(STORAGE_KEYS.promptSettings),
+    elevenlabs: readJson(STORAGE_KEYS.elevenlabsSettings),
   };
   const hasSplitSettings = Object.values(split).some(Boolean);
 
@@ -335,7 +357,32 @@ export function saveSettings(settings) {
     window.dispatchEvent(new Event("dukou:settings-changed"));
   }
 
+  // background cloud sync
+  if (isLoggedIn()) {
+    const payload = {};
+    for (const [key, storeKey] of [
+      ["model", STORAGE_KEYS.modelSettings],
+      ["memory", STORAGE_KEYS.memorySettings],
+      ["transport", STORAGE_KEYS.transportSettings],
+      ["ui", STORAGE_KEYS.uiSettings],
+      ["prompt", STORAGE_KEYS.promptSettings],
+      ["elevenlabs", STORAGE_KEYS.elevenlabsSettings],
+    ]) {
+      if (next[key]) payload[storeKey] = next[key];
+    }
+    pushSettings(payload).catch(() => {});
+  }
+
   return next;
+}
+
+export async function loadCloudSettings() {
+  if (!isLoggedIn()) return null;
+  try {
+    return await fetchSettings();
+  } catch {
+    return null;
+  }
 }
 
 export function getModelSettings() {
@@ -363,6 +410,10 @@ export function clearModelApiKey() {
       apiKey: "",
     },
   });
+}
+
+export function getElevenlabsSettings() {
+  return getSettings().elevenlabs;
 }
 
 export function clearLocalSecrets() {

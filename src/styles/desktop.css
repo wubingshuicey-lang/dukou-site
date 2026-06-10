@@ -1,0 +1,234 @@
+/* --- Login Page --- */
+
+.login-root {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  background: var(--shell-bg);
+}
+
+.login-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 48px 40px;
+}
+
+.login-avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--paper-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  color: var(--text-main);
+}
+
+.login-title {
+  font-size: 24px;
+  color: var(--text-main);
+  font-weight: 400;
+  margin: 0;
+}
+
+.login-sub {
+  color: var(--text-sub);
+  font-size: 13px;
+  margin: 0 0 8px;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 220px;
+}
+
+.login-input {
+  width: 100%;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  background: var(--input-bg);
+  color: var(--text-main);
+  font-size: 15px;
+  outline: none;
+  text-align: center;
+  font-family: inherit;
+}
+
+.login-input::placeholder {
+  color: var(--text-sub);
+}
+
+.login-error {
+  color: var(--danger);
+  font-size: 12px;
+  margin: 0;
+}
+
+.login-btn {
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  background: var(--paper-2);
+  color: var(--text-main);
+  font-size: 15px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.2s;
+}
+
+.login-btn:hover:not(:disabled) {
+  background: var(--highlight-bg);
+}
+
+.login-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.login-shake {
+  animation: loginShake 0.4s ease;
+}
+
+@keyframes loginShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  40% { transform: translateX(8px); }
+  60% { transform: translateX(-6px); }
+  80% { transform: translateX(6px); }
+}
+
+/* --- Desktop / Home Screen --- */
+
+.desktop-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--shell-bg);
+  padding: 0 var(--spacing-md, 12px);
+}
+
+.desktop-statusbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 8px 10px;
+  color: var(--text-main);
+  font-size: 13px;
+}
+
+.desktop-greeting {
+  color: var(--text-sub);
+  font-size: 12px;
+}
+
+/* --- App Grid --- */
+
+.desktop-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 22px 14px;
+  padding: 36px 8px 20px;
+  flex: 1;
+  align-content: start;
+}
+
+.desktop-app-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px 4px;
+  border-radius: 14px;
+  transition: background 0.2s;
+  font-family: inherit;
+}
+
+.desktop-app-icon:hover:not(:disabled) {
+  background: var(--highlight-bg);
+}
+
+.desktop-app-icon:active:not(:disabled) {
+  background: var(--panel-bg);
+}
+
+.desktop-app-disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.desktop-icon-badge {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  color: #fff;
+  background: var(--accent-cold);
+  box-shadow: 0 2px 10px rgba(44, 44, 44, 0.12);
+}
+
+.desktop-icon-badge.wechat {
+  background: #5a8a6a;
+}
+
+.desktop-icon-badge.dukou {
+  background: var(--accent-cold);
+}
+
+.desktop-icon-badge.settings {
+  background: var(--accent-warm);
+}
+
+.desktop-icon-label {
+  color: var(--text-main);
+  font-size: 11px;
+  text-align: center;
+}
+
+.desktop-icon-soon {
+  font-size: 9px;
+  color: var(--text-sub);
+  margin-top: -4px;
+}
+
+/* --- Dock --- */
+
+.desktop-dock {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  padding: 12px 20px 18px;
+  margin: 0 16px 12px;
+  background: var(--panel-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 22px;
+  border: 1px solid var(--border-color);
+}
+
+.desktop-dock-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 12px;
+  transition: background 0.15s;
+}
+
+.desktop-dock-icon:hover {
+  background: var(--highlight-bg);
+}

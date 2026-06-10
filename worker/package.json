@@ -1,0 +1,16 @@
+{
+  "name": "dukou-api",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:init": "wrangler d1 execute dukou-db --file=./schema.sql"
+  },
+  "dependencies": {
+    "hono": "^4.0.0"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}

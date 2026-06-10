@@ -1,4 +1,5 @@
 import { getLocalUserId, getSessionId } from "../store/session.js";
+import { isLoggedIn, pushMessage as apiPushMessage, fetchMessages as apiFetchMessages } from "./apiClient.js";
 
 const DB_NAME = "dukou-message-archive";
 const DB_VERSION = 1;
@@ -83,6 +84,7 @@ export function normalizeArchivedMessage(record = {}) {
 
   return {
     id: record.id || makeMessageId(),
+    messageType: record.messageType || "text",
     conversationId,
     chatSpaceId: record.chatSpaceId || record.meta?.chatSpaceId || conversationId,
     sessionId,
@@ -240,7 +242,33 @@ export async function saveMessage(message) {
   transaction.objectStore(MESSAGE_STORE).put(record);
   await transactionDone(transaction);
   emitArchiveChanged();
+
+  // background cloud sync
+  if (isLoggedIn()) {
+    apiPushMessage(record).catch(() => {});
+  }
+
   return record;
+}
+
+export async function loadCloudMessages(chatSpaceId, limit = 50) {
+  if (!isLoggedIn()) return [];
+  try {
+    const msgs = await apiFetchMessages(chatSpaceId, limit);
+    if (Array.isArray(msgs) && msgs.length) {
+      const db = await getReadyDb();
+      const transaction = db.transaction(MESSAGE_STORE, "readwrite");
+      const store = transaction.objectStore(MESSAGE_STORE);
+      for (const msg of msgs) {
+        store.put(normalizeArchivedMessage(msg));
+      }
+      await transactionDone(transaction);
+      emitArchiveChanged();
+    }
+    return msgs || [];
+  } catch {
+    return [];
+  }
 }
 
 export async function getLatestMessages(limit = 50, { conversationId = DEFAULT_CONVERSATION_ID, includeExcluded = false } = {}) {
@@ -372,6 +400,7 @@ function toExportMessage(message) {
   const normalized = normalizeArchivedMessage(message);
   return {
     id: normalized.id,
+    messageType: normalized.messageType || "text",
     conversationId: normalized.conversationId,
     sessionId: normalized.sessionId,
     role: normalized.role,

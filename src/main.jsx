@@ -4,6 +4,8 @@ import App from "./App.jsx";
 import { applyUiSettings } from "./store/settings.js";
 import "./styles/theme.css";
 import "./styles/chat.css";
+import "./styles/desktop.css";
+import "./styles/wechat.css";
 
 applyUiSettings();
 

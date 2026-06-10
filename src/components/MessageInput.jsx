@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 function truncateText(text, limit = 30) {
   const clean = String(text || "").replace(/\s+/g, " ").trim();
@@ -11,6 +11,26 @@ function getQuoteAuthorLabel(quote, displayNames) {
   if (quote?.authorName === "机") return displayNames.assistant;
   if (quote?.authorName === "我") return displayNames.user;
   return quote?.authorName || displayNames.user;
+}
+
+function compressImage(file, maxSize) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((blob) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+      }, "image/jpeg", 0.85);
+    };
+    img.src = URL.createObjectURL(file);
+  });
 }
 
 function PlusIcon() {
@@ -65,6 +85,14 @@ function CallIcon() {
   );
 }
 
+function SparkleIcon() {
+  return (
+    <svg viewBox="0 0 18 18" aria-hidden="true">
+      <path d="M9 2.5l.8 3.2c.2.8.8 1.4 1.6 1.6l3.1.7-3.1.7c-.8.2-1.4.8-1.6 1.6L9 13.5l-.8-3.2c-.2-.8-.8-1.4-1.6-1.6l-3.1-.7 3.1-.7c.8-.2 1.4-.8 1.6-1.6L9 2.5z" />
+    </svg>
+  );
+}
+
 export default function MessageInput({
   value,
   quote,
@@ -76,23 +104,53 @@ export default function MessageInput({
   disabledLabel = "机暂时离开了",
   placeholder = "说点什么...",
   displayNames = { assistant: "机", user: "我" },
+  onVoiceInput,
+  voiceEnabled = false,
+  voiceActive = false,
+  onImageSelect,
+  pendingImage,
+  onClearImage,
+  onGenerateImage,
 }) {
   const [toolsOpen, setToolsOpen] = useState(false);
+  const fileInputRef = useRef(null);
   const hasTextContent = Boolean(value.trim());
+  const hasPendingContent = hasTextContent || Boolean(pendingImage);
   const toolItems = [
     { id: 'image', label: '图片', icon: <ImageIcon /> },
+    { id: 'generate', label: '生图', icon: <SparkleIcon /> },
     { id: 'file', label: '上传文件', icon: <FileIcon /> },
     { id: 'call', label: '电话', icon: <CallIcon /> },
   ];
 
   const selectTool = (id) => {
-    onToolAction?.(id);
+    if (id === "image") {
+      fileInputRef.current?.click();
+    } else if (id === "generate") {
+      onGenerateImage?.();
+    } else {
+      onToolAction?.(id);
+    }
     setToolsOpen(false);
   };
 
+  const handleFileChange = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const compressed = await compressImage(file, 1024);
+    onImageSelect?.(compressed);
+    // Reset the input so the same file can be selected again
+    event.target.value = "";
+  };
+
   const submitInput = () => {
-    if (hasTextContent) {
+    if (hasPendingContent) {
       onSend();
+      return;
+    }
+
+    if (voiceEnabled && onVoiceInput) {
+      onVoiceInput();
       return;
     }
 
@@ -101,6 +159,19 @@ export default function MessageInput({
 
   return (
     <div className="message-input-area">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: "none" }}
+        onChange={handleFileChange}
+      />
+      {pendingImage && (
+        <div className="message-image-preview">
+          <img src={pendingImage} alt="待发送图片" />
+          <button type="button" onClick={onClearImage} aria-label="移除图片">×</button>
+        </div>
+      )}
       <form
         className="message-input-bar"
         onSubmit={(event) => {
@@ -144,12 +215,13 @@ export default function MessageInput({
           />
         </div>
         <button
-          className={'send-button' + (hasTextContent ? '' : ' is-voice')}
+          className={'send-button' + (hasPendingContent ? '' : ' is-voice') + (voiceActive ? ' is-recording' : '')}
           type='submit'
           disabled={disabled}
-          aria-label={hasTextContent ? '发送' : '发送语音'}
+          aria-label={hasPendingContent ? '发送' : voiceEnabled ? '语音输入' : '发送语音'}
+          style={voiceActive ? { background: 'var(--danger)', animation: 'du-pulse 1s infinite' } : undefined}
         >
-          {hasTextContent ? <SendIcon /> : <VoiceIcon />}
+          {hasPendingContent ? <SendIcon /> : voiceEnabled ? (voiceActive ? <span style={{fontSize:10}}>■</span> : <VoiceIcon />) : <VoiceIcon />}
         </button>
       </form>
       {toolsOpen && (

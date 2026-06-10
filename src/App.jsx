@@ -1,55 +1,124 @@
-import { useEffect, useState } from "react";
-import Entry from "./pages/Entry.jsx";
-import Chat from "./pages/Chat.jsx";
-import Settings from "./pages/Settings.jsx";
+import { useState, useEffect } from "react";
+import LoginPage from "./pages/LoginPage.jsx";
+import DesktopScreen from "./pages/DesktopScreen.jsx";
+import WeChatApp from "./apps/WeChatApp.jsx";
 import FunctionPage from "./pages/FunctionPage.jsx";
-import BottomNav from "./components/BottomNav.jsx";
+import Settings from "./pages/Settings.jsx";
+import CharacterCreatePage from "./pages/CharacterCreatePage.jsx";
+import BeyondApp from "./apps/BeyondApp.jsx";
+import GalleryApp from "./apps/GalleryApp.jsx";
+import { loadCloudSettings } from "./store/settings.js";
+import { loadCloudCharacters } from "./store/characters.js";
 
 export default function App() {
-  const [screen, setScreen] = useState("entry");
-  const [activeTab, setActiveTab] = useState("chat");
-  const [hideFunctionBottomNav, setHideFunctionBottomNav] = useState(false);
-  const [pendingChatQuote, setPendingChatQuote] = useState(null);
+  const [screen, setScreen] = useState("login");
+  const [activeApp, setActiveApp] = useState(null);
+  const [subPage, setSubPage] = useState(null);
 
   useEffect(() => {
-    if (activeTab !== "function") {
-      setHideFunctionBottomNav(false);
+    if (screen !== "login") {
+      loadCloudSettings().catch(() => {});
+      loadCloudCharacters().catch(() => {});
     }
-  }, [activeTab]);
+  }, [screen]);
 
-  function openChatWithQuote(quote) {
-    setPendingChatQuote({
-      ...quote,
-      id: `quote-${Date.now()}`,
-    });
-    setActiveTab("chat");
+  function handleOpenApp(appId) {
+    setActiveApp(appId);
+    setScreen("app");
+  }
+
+  function handleCloseApp() {
+    setActiveApp(null);
+    setSubPage(null);
+    setScreen("desktop");
+  }
+
+  function handleOpenSubPage(page) {
+    setSubPage(page);
+  }
+
+  function handleCloseSubPage() {
+    setSubPage(null);
+  }
+
+  function renderApp() {
+    if (subPage === "characterCreate") {
+      return <CharacterCreatePage onBack={handleCloseSubPage} />;
+    }
+
+    switch (activeApp) {
+      case "wechat":
+        return <WeChatApp onBack={handleCloseApp} onOpenSubPage={handleOpenSubPage} />;
+      case "function":
+        return (
+          <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+            <button
+              onClick={handleCloseApp}
+              style={{
+                margin: "8px 12px",
+                background: "var(--panel-bg)",
+                backdropFilter: "blur(8px)",
+                border: "1px solid var(--border-color)",
+                borderRadius: 8,
+                padding: "6px 12px",
+                fontSize: 12,
+                cursor: "pointer",
+                color: "var(--text-sub)",
+                fontFamily: "inherit",
+                alignSelf: "flex-start",
+              }}
+            >
+              ← 桌面
+            </button>
+            <div style={{ flex: 1, overflow: "auto" }}>
+              <FunctionPage />
+            </div>
+          </div>
+        );
+      case "gallery":
+        return <GalleryApp onBack={handleCloseApp} />;
+      case "beyond":
+        return <BeyondApp onBack={handleCloseApp} />;
+      case "settings":
+        return (
+          <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+            <button
+              onClick={handleCloseApp}
+              style={{
+                margin: "8px 12px",
+                background: "var(--panel-bg)",
+                backdropFilter: "blur(8px)",
+                border: "1px solid var(--border-color)",
+                borderRadius: 8,
+                padding: "6px 12px",
+                fontSize: 12,
+                cursor: "pointer",
+                color: "var(--text-sub)",
+                fontFamily: "inherit",
+                alignSelf: "flex-start",
+              }}
+            >
+              ← 桌面
+            </button>
+            <div style={{ flex: 1, overflow: "auto" }}>
+              <Settings />
+            </div>
+          </div>
+        );
+      default:
+        return <DesktopScreen onOpenApp={handleOpenApp} />;
+    }
   }
 
   return (
     <div className="app-backdrop">
-      <main className="phone-shell" aria-label="AI 陪伴前端">
-        {screen === "entry" ? (
-          <Entry onEnter={() => setScreen("main")} />
-        ) : (
-          <>
-            <div className="page-host">
-              {activeTab === "chat" && (
-                <Chat
-                  pendingQuote={pendingChatQuote}
-                  onPendingQuoteAccepted={() => setPendingChatQuote(null)}
-                  onOpenSettings={() => setActiveTab("settings")}
-                  onOpenFunction={() => setActiveTab("function")}
-                />
-              )}
-              {activeTab === "function" && (
-                <FunctionPage onDetailOverlayChange={setHideFunctionBottomNav} onOpenChatWithQuote={openChatWithQuote} />
-              )}
-              {activeTab === "settings" && <Settings />}
-            </div>
-            {activeTab !== "chat" && !(activeTab === "function" && hideFunctionBottomNav) && (
-              <BottomNav activeTab={activeTab} onChange={setActiveTab} />
-            )}
-          </>
+      <main className="phone-shell" aria-label="渡口">
+        {screen === "login" && <LoginPage onLogin={() => setScreen("desktop")} />}
+        {screen === "desktop" && <DesktopScreen onOpenApp={handleOpenApp} />}
+        {screen === "app" && (
+          <div className="page-host">
+            {renderApp()}
+          </div>
         )}
       </main>
     </div>

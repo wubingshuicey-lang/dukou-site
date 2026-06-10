@@ -1,0 +1,11 @@
+name = "dukou-api"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "dukou-db"
+database_id = "f03c94d7-1ab1-41c7-9539-42e7cd907e57"
+
+[env.production]
+name = "dukou-api"

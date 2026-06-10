@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import Bubble from "../components/Bubble.jsx";
+import CharacterModelSettings from "../components/CharacterModelSettings.jsx";
 import ChatHistoryOverlay from "../components/ChatHistoryOverlay.jsx";
 import MemoryDrawer from "../components/MemoryDrawer.jsx";
 import MessageInput from "../components/MessageInput.jsx";
@@ -12,14 +13,18 @@ import emotionHappySrc from "../assets/emotion-happy.svg";
 import emotionSadSrc from "../assets/emotion-sad.svg";
 import { getEmotionState, getInjectedMemories } from "../api/memory.js";
 import { getRecentMessages, insertMessage, markDuMessagesRead, markUserMessagesRead, updateMessageRecord } from "../api/messages.js";
+import { loadCloudMessages } from "../api/messageArchive.js";
 import { sendChatRequest } from "../api/chatTransport.js";
-import { normalizeModelError } from "../api/modelClient.js";
+import { callModel, normalizeModelError } from "../api/modelClient.js";
+import { generateImage } from "../api/providers/imageGeneration.js";
 import { getMemorySettings, getModelSettings, getPromptSettings, getSettings, getTransportSettings } from "../store/settings.js";
+import { addMemories, getRecentMemories } from "../store/characterMemory.js";
+import { searchMemories } from "../systems/memorySearch.js";
 import { saveContextSnapshot, updateContextSnapshot } from "../store/contextLogs.js";
 import { getSessionId } from "../store/session.js";
 import { buildContextPreview } from "../systems/context.js";
 import { maybeTriggerRollingSummary } from "../systems/pipeline.js";
-import { fallbackReplyFor, parseSpecialActions, splitToMessages } from "../systems/specialActions.js";
+import { fallbackReplyFor, parseSpecialActions, splitToMessages, stripSpecialTags } from "../systems/specialActions.js";
 
 function sleep(ms) {
   return new Promise((resolve) => {
@@ -273,7 +278,7 @@ function getSpaceMemorySettings(memorySettings, chatSpaceId) {
 
 function getSpaceTransportSettings(transportSettings, chatSpaceId) {
   const chatTransport = transportSettings?.chatTransport || "mock";
-  if (chatSpaceId === "main") return transportSettings;
+  if (chatSpaceId === "main" || chatSpaceId.startsWith("char_")) return transportSettings;
   if (chatSpaceId === "model_test") {
     return {
       ...transportSettings,
@@ -587,6 +592,8 @@ function quoteFromMessage(message, displayNames = DEFAULT_DISPLAY_NAMES) {
 function makeUiMessage({
   role,
   content,
+  messageType = "text",
+  imageUrl,
   readByDu = false,
   quote = null,
   reasoningContent = "",
@@ -611,6 +618,8 @@ function makeUiMessage({
     content,
     created_at: new Date().toISOString(),
     read_by_user: role === "assistant",
+    messageType,
+    imageUrl,
     read_by_du: readByDu,
     status,
     excludedFromContext,
@@ -715,6 +724,30 @@ function patchContextLog(id, patch) {
   }
 }
 
+async function maybeExtractMemories(chatSpaceId, messages, modelSettings) {
+  if (!chatSpaceId || !chatSpaceId.startsWith("char_")) return;
+  const visible = getVisibleMessages(messages);
+  if (visible.length < 10 || visible.length % 10 !== 0) return;
+
+  try {
+    const convo = visible.slice(-20).map(m => `${m.role === "user" ? "用户" : "角色"}: ${m.content}`).join("\n");
+    const settings = modelSettings || getModelSettings();
+    if (!settings.apiKey) return;
+
+    const result = await callModel({
+      messages: [{ role: "user", content: `从以下对话中提取3-5条关于用户的关键信息，每条不超过30字。只输出提取的信息，每行一条，不要编号：\n${convo}` }],
+      systemPrompt: "你是信息提取助手。只输出关键事实，每行一条，不要编号和前缀。",
+      settings,
+    });
+    if (result.ok && result.text) {
+      const facts = result.text.split("\n").map(s => s.trim()).filter(Boolean);
+      if (facts.length) addMemories(chatSpaceId, facts);
+    }
+  } catch {
+    // memory extraction is best-effort
+  }
+}
+
 function FunctionIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -779,7 +812,7 @@ function RegenerateIcon() {
   );
 }
 
-export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSettings, onOpenFunction }) {
+export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSettings, onOpenFunction, chatSpaceId: propChatSpaceId, characterId, characterName, characterPersonality, characterBackstory, characterModelSettings, characterVoiceId, characterVoiceApiKey, characterVoiceMode = "off", characterTtsEnabled, characterSttEnabled, onCharacterSettingsSaved, onBack }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [activeQuote, setActiveQuote] = useState(null);
@@ -789,12 +822,12 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
   const [tokenOpen, setTokenOpen] = useState(false);
   const [usage, setUsage] = useState(null);
   const [modelError, setModelError] = useState(null);
-  const [activeChatSpaceId, setActiveChatSpaceId] = useState(() => readActiveChatSpace());
+  const [activeChatSpaceId, setActiveChatSpaceId] = useState(() => propChatSpaceId || readActiveChatSpace());
   const [chatSpaceDrawerOpen, setChatSpaceDrawerOpen] = useState(false);
-  const [sessionStatus, setSessionStatus] = useState(() => readChatStatus(readActiveChatSpace()));
+  const [sessionStatus, setSessionStatus] = useState(() => readChatStatus(propChatSpaceId || readActiveChatSpace()));
   const [noteText, setNoteText] = useState("");
   const [blockedNoteDialog, setBlockedNoteDialog] = useState(null);
-  const [blockedNotes, setBlockedNotes] = useState(() => readBlockedNotes(readActiveChatSpace()));
+  const [blockedNotes, setBlockedNotes] = useState(() => readBlockedNotes(propChatSpaceId || readActiveChatSpace()));
   const [editingUserMessage, setEditingUserMessage] = useState(null);
   const [editText, setEditText] = useState("");
   const [highlightedMessageId, setHighlightedMessageId] = useState("");
@@ -810,6 +843,20 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
   const [placeholderNotice, setPlaceholderNotice] = useState("");
   const [showScrollBottom, setShowScrollBottom] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState(null);
+  const [characterSettingsOpen, setCharacterSettingsOpen] = useState(false);
+  const [pendingImage, setPendingImage] = useState("");
+  const [verbosity, setVerbosity] = useState(() => {
+    if (typeof window !== "undefined") {
+      return window.localStorage.getItem("dukou:verbosity") || "short";
+    }
+    return "short";
+  });
+  const [voiceActive, setVoiceActive] = useState(false);
+  const [voiceError, setVoiceError] = useState("");
+  const [playingMessageId, setPlayingMessageId] = useState(null);
+  const [generateOpen, setGenerateOpen] = useState(false);
+  const [generatePrompt, setGeneratePrompt] = useState("");
+  const [generateLoading, setGenerateLoading] = useState(false);
   const [uiSettings, setUiSettings] = useState(() => getSettings().ui);
   const endRef = useRef(null);
   const messageListRef = useRef(null);
@@ -1032,8 +1079,19 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
     }, 1300);
   };
 
+  const handleSaveImage = async (id) => {
+    const target = messagesRef.current.find((message) => message.id === id);
+    if (!target) return;
+    const nextMeta = { ...target.meta, savedToGallery: true };
+    updateMessage(id, { meta: nextMeta });
+    if (isPersistedChatSpace(activeChatSpaceRef.current)) {
+      await updateMessageRecord(id, { meta: nextMeta });
+    }
+  };
+
   const sendAssistantParts = async ({
     parts,
+    voiceIndices = [],
     reasoningContent = "",
     reasoningSource,
     chatSpaceId = activeChatSpaceRef.current,
@@ -1043,6 +1101,7 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
     quote = null,
   }) => {
     const responseGroupId = meta.responseGroupId || createResponseGroupId(chatSpaceId);
+    const voiceSet = new Set(voiceIndices);
     for (const [index, part] of parts.entries()) {
       updateSessionStatus("typing", chatSpaceId);
       setTyping(true);
@@ -1051,6 +1110,7 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
       const assistantMessage = makeUiMessage({
         role: "assistant",
         content: part,
+        messageType: voiceSet.has(index) ? "voice" : "text",
         conversationId: chatSpaceId,
         chatSpaceId,
         responseGroupId,
@@ -1068,6 +1128,72 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
     }
   };
 
+  const generateImagesForReply = async (imagePrompts, chatSpaceId, persist) => {
+    const settings = characterModelSettings || getModelSettings();
+    if (!settings.apiKey) {
+      setModelError({ type: "warn", message: "缺少 API Key，无法生成图片" });
+      return;
+    }
+
+    for (const prompt of imagePrompts) {
+      try {
+        setTyping(true);
+        const imageUrl = await generateImage({
+          prompt,
+          settings: { ...settings, imageModel: "openai/gpt-image-2" },
+        });
+        setTyping(false);
+
+        const imgMessage = makeUiMessage({
+          role: "assistant",
+          content: "",
+          imageUrl,
+          messageType: "text",
+          conversationId: chatSpaceId,
+          chatSpaceId,
+          meta: { source: "ai_generated", imagePrompt: prompt, savedToGallery: false },
+        });
+        appendMessage(imgMessage);
+        if (persist) {
+          await insertMessage(imgMessage);
+        }
+        scrollToBottom("smooth");
+      } catch (err) {
+        setTyping(false);
+        setModelError({ type: "warn", message: `图片生成失败：${err.message || "未知错误"}` });
+      }
+    }
+  };
+
+  // Detect if user message suggests they want to see a photo of the character
+  const hasPhotoIntent = (userText) => {
+    const triggers = ["想看看你", "想你了", "在干嘛", "在做什么", "在哪", "照片", "自拍", "长什么样", "看看你", "拍一张", "发张"];
+    return triggers.some((t) => userText.includes(t));
+  };
+
+  // Fallback: when AI didn't use <image> tags but user clearly wants a photo,
+  // call AI separately to generate a scene description, then generate the image.
+  const generateImageFromContext = async (userText, chatSpaceId, persist) => {
+    const settings = characterModelSettings || getModelSettings();
+    if (!settings.apiKey) return;
+
+    try {
+      const result = await callModel({
+        messages: [{ role: "user", content: `用户说："${userText}"。根据当前时间（${new Date().toLocaleString("zh-CN")}）和语境，描述一张你（AI 角色）此刻的真实照片画面。包含：时间、场景、光线、你的动作神态、穿着。50字左右中文。只输出画面描述，不要加前缀。` }],
+        systemPrompt: "你是照片画面描述生成器。只输出具体的画面描述，不要加任何说明、前缀或评价。",
+        settings,
+      });
+      if (result.ok && result.text) {
+        const prompt = result.text.trim();
+        if (prompt) {
+          await generateImagesForReply([prompt], chatSpaceId, persist);
+        }
+      }
+    } catch {
+      // best-effort fallback
+    }
+  };
+
   const buildReplyParts = async ({
     userText = "",
     opening = false,
@@ -1075,7 +1201,7 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
     chatSpaceId = activeChatSpaceRef.current,
     sourceMessages = messagesRef.current,
   } = {}) => {
-    const settings = getModelSettings();
+    const settings = characterModelSettings || getModelSettings();
     const baseMemorySettings = getMemorySettings();
     const memorySettings = getSpaceMemorySettings(baseMemorySettings, chatSpaceId);
     const transportSettings = getSpaceTransportSettings(getTransportSettings(), chatSpaceId);
@@ -1083,9 +1209,25 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
 
     const memoryLimit = Number(memorySettings.injectedMemoryLimit || 8);
     const recentLimit = Number(memorySettings.recentMessageLimit || 20);
-    const shouldUseLongTermMemory = chatSpaceId === "main";
+    const shouldUseLongTermMemory = chatSpaceId === "main" || chatSpaceId.startsWith("char_");
+    const isCharSpace = chatSpaceId.startsWith("char_");
     const [memories, emotion] = await Promise.all([
-      shouldUseLongTermMemory ? getInjectedMemories(memoryLimit, memorySettings) : [],
+      shouldUseLongTermMemory
+        ? isCharSpace
+          ? (() => {
+              const all = getRecentMemories(chatSpaceId, 50);
+              // Use semantic search when we have a user message to match against
+              const queryText = !opening ? userText : "";
+              const selected = queryText ? searchMemories(all, queryText, memoryLimit) : all.slice(-memoryLimit);
+              return selected.map(m => ({
+                id: m.id,
+                summary: m.text,
+                level2_category: "记忆",
+                conversation_date: m.createdAt?.slice(0, 10),
+              }));
+            })()
+          : getInjectedMemories(memoryLimit, memorySettings)
+        : [],
       getEmotionState(),
     ]);
     const recentMessages = getModelContextMessages(sourceMessages)
@@ -1093,6 +1235,7 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
       .map((message) => ({
         role: message.role,
         content: buildQuotedContent(message.content, getMessageQuote(message), message.role),
+        imageUrl: message.imageUrl,
         created_at: message.created_at,
       }));
     const contextPreview = buildContextPreview({
@@ -1102,11 +1245,24 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
       modelSettings: settings,
       memorySettings,
       promptSettings,
+      characterPersonality: isCharSpace ? {
+        name: characterName,
+        personality: characterPersonality,
+        backstory: characterBackstory,
+        voiceMode: characterVoiceMode,
+      } : null,
     });
     const timeContext = { role: "user", content: contextPreview.timeContext };
-    const uiAwarenessContext =
-      chatSpaceId === "main" ? buildUiAwarenessContext({ affordanceState: readChatAffordanceState() }) : null;
-    const awarenessMessages = uiAwarenessContext ? [uiAwarenessContext] : [];
+    const uiAwarenessContext = buildUiAwarenessContext({
+      affordanceState: readChatAffordanceState(),
+    });
+    const voiceContext = isCharSpace && characterVoiceMode === "auto"
+      ? { role: "user", content: "（需要时可以用 <say>说出口的话</say> 发语音，不想发就不用。）" }
+      : null;
+    const verbosityContext = verbosity === "long" && !blockedNote
+      ? { role: "user", content: "（多说一点，不用限制字数，像真的在聊天一样自然地表达。）" }
+      : null;
+    const awarenessMessages = [uiAwarenessContext, voiceContext, verbosityContext].filter(Boolean);
     const blockedNoteInstruction = blockedNote
       ? {
           role: "user",
@@ -1148,14 +1304,44 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
       baseMemorySettings.saveContextLogs !== false && chatSpaceId !== "incognito"
     );
 
-    const result = await sendChatRequest({
-      messages: requestMessages,
+    // Build request with images included — try vision first, fallback to text
+    const hasImages = recentMessages.some(m => m.imageUrl);
+    const buildRequestMessages = (useImages) => {
+      const msgs = recentMessages.map(m => {
+        if (m.imageUrl && !useImages) {
+          return { ...m, imageUrl: undefined, content: "[图片] " + (m.content || "") };
+        }
+        return m;
+      });
+      return opening
+        ? requestMessages
+        : [timeContext, ...awarenessMessages, ...(blockedNoteInstruction ? [blockedNoteInstruction] : []), ...msgs];
+    };
+
+    let result = await sendChatRequest({
+      messages: buildRequestMessages(hasImages),
       systemPrompt: contextPreview.systemPrompt,
       modelSettings: settings,
       memorySettings,
       transportSettings,
       mockText: getMockTextForSpace({ chatSpaceId, userText, opening, blockedNote }),
     });
+
+    // If vision request failed, retry without images
+    if (!result.ok && hasImages) {
+      const retryResult = await sendChatRequest({
+        messages: buildRequestMessages(false),
+        systemPrompt: contextPreview.systemPrompt,
+        modelSettings: settings,
+        memorySettings,
+        transportSettings,
+        mockText: getMockTextForSpace({ chatSpaceId, userText: "[用户发了一张图片]" + (userText ? " " + userText : ""), opening, blockedNote }),
+      });
+      if (retryResult.ok) {
+        result = retryResult;
+        setModelError({ type: "info", message: "当前模型不支持直接读图，已转为文字模式" });
+      }
+    }
 
     if (!result.ok) {
       setModelError(result.error);
@@ -1189,7 +1375,68 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
           : parsed.noReply && blockedNote
             ? "blocked"
             : "";
-    let parts = splitToMessages(parsed.text, settings.outputMode);
+    // Extract <image>prompt</image> before any text processing.
+    // These will be generated as separate image messages after text.
+    const rawTextForImage = stripSpecialTags(assistantQuote.text || "");
+    const imageRegex = /<image>([\s\S]*?)<\/image>/gi;
+    const imagePrompts = [];
+    let imgMatch;
+    while ((imgMatch = imageRegex.exec(rawTextForImage)) !== null) {
+      const prompt = imgMatch[1].trim();
+      if (prompt) imagePrompts.push(prompt);
+    }
+    // Strip <image> tags from the quote text so they don't appear in parts
+    let cleanText = rawTextForImage.replace(imageRegex, "").trim();
+
+    // Pre-process <say>spoken</say> tags before splitToMessages, so tags never get
+    // torn apart by punctuation splitting. Also keep backward compat with [voice].
+    const shouldProcessVoice = isCharSpace && characterVoiceMode === "auto";
+    let voiceIndices = [];
+    let parts;
+
+    if (shouldProcessVoice) {
+      const rawText = cleanText;
+      const sayRegex = /<say>([\s\S]*?)<\/say>/gi;
+      const segments = []; // { type: "text" | "voice", content: string }
+      let lastIndex = 0;
+      let match;
+      while ((match = sayRegex.exec(rawText)) !== null) {
+        const before = rawText.slice(lastIndex, match.index).trim();
+        if (before) segments.push({ type: "text", content: before });
+        const spoken = match[1].trim();
+        if (spoken) segments.push({ type: "voice", content: spoken });
+        lastIndex = sayRegex.lastIndex;
+      }
+      const after = rawText.slice(lastIndex).trim();
+      if (after) segments.push({ type: "text", content: after });
+
+      if (segments.length > 0) {
+        parts = [];
+        for (const seg of segments) {
+          if (seg.type === "voice") {
+            voiceIndices.push(parts.length);
+            parts.push(seg.content);
+          } else {
+            // Apply [voice] backward compat: if text segment has [voice], whole thing is voice
+            if (/\[voice\]/i.test(seg.content)) {
+              const clean = seg.content.replace(/\[voice\]/gi, "").trim();
+              if (clean) {
+                voiceIndices.push(parts.length);
+                parts.push(clean);
+              }
+            } else {
+              const splitTexts = splitToMessages(seg.content, settings.outputMode);
+              for (const t of splitTexts) parts.push(t);
+            }
+          }
+        }
+      } else {
+        parts = splitToMessages(cleanText || assistantQuote.text, settings.outputMode);
+      }
+    } else {
+      parts = splitToMessages(parsed.text.replace(imageRegex, "").trim(), settings.outputMode);
+    }
+
     if (blockedNote && parsed.unblockUser) {
       parts = buildBlockedUnblockReplyParts(parts);
     } else if (blockedNote && parsed.noReply) {
@@ -1200,6 +1447,8 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
 
     return {
       parts,
+      voiceIndices,
+      imagePrompts,
       reasoningContent: result.reasoningContent || "",
       reasoningSource: result.reasoningSource,
       quote: assistantQuote.quote,
@@ -1279,6 +1528,8 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
           return;
         }
 
+        // load cloud messages first, then local (local takes precedence for duplicates)
+        await loadCloudMessages(chatSpaceId, 50);
         const recent = await getRecentMessages(50, { conversationId: chatSpaceId });
         await markDuMessagesRead({ conversationId: chatSpaceId });
         if (cancelled) return;
@@ -1293,6 +1544,7 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
           const reply = await buildReplyParts({ opening: true, chatSpaceId, sourceMessages: readMessages });
           if (reply.parts.length) {
             await sendAssistantParts({ ...reply, chatSpaceId, persist: true, meta: { opening: true, chatSpaceId } });
+
           }
           updateSessionStatus(reply.nextStatus || "idle", chatSpaceId);
         }
@@ -1318,9 +1570,10 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
 
   const send = async () => {
     const text = input.trim();
+    const imageData = pendingImage;
     const chatSpaceId = activeChatSpaceRef.current;
     const persist = isPersistedChatSpace(chatSpaceId);
-    if (!text || editingUserMessage || typing || isSending || sendingRef.current || ["away", "ended"].includes(sessionStatus)) return;
+    if ((!text && !imageData) || editingUserMessage || typing || isSending || sendingRef.current || ["away", "ended"].includes(sessionStatus)) return;
 
     const quote = normalizeQuotePayload(activeQuote);
     const shouldAutoKeepsake = chatSpaceId === "main" && shouldCreateAutoKeepsake(text);
@@ -1349,11 +1602,13 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
     setIsSending(true);
     updateSessionStatus("waiting_model", chatSpaceId);
     setInput("");
+    setPendingImage("");
     setActiveQuote(null);
     setModelError(null);
     const userMessage = makeUiMessage({
       role: "user",
-      content: text,
+      content: text || (imageData ? "[图片]" : ""),
+      imageUrl: imageData || undefined,
       readByDu: false,
       quote,
       conversationId: chatSpaceId,
@@ -1380,9 +1635,17 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
       const reply = await buildReplyParts({ userText: text, chatSpaceId });
       if (reply.parts.length) {
         await sendAssistantParts({ ...reply, chatSpaceId, persist, meta: { source: "model_or_fallback", chatSpaceId } });
+        // Generate images from <image> tags asynchronously
+        if (reply.imagePrompts?.length) {
+          generateImagesForReply(reply.imagePrompts, chatSpaceId, persist);
+        } else if (hasPhotoIntent(text)) {
+          // Fallback: AI didn't use <image> tag but user clearly wants a photo
+          generateImageFromContext(text, chatSpaceId, persist);
+        }
         if (chatSpaceId === "main") {
           await maybeTriggerRollingSummary(messagesRef.current, sessionIdRef.current);
         }
+        maybeExtractMemories(chatSpaceId, messagesRef.current, characterModelSettings || getModelSettings());
         updateSessionStatus(reply.nextStatus || "idle", chatSpaceId);
       } else {
         updateSessionStatus(reply.nextStatus || "failed", chatSpaceId);
@@ -1565,6 +1828,7 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
         if (chatSpaceId === "main") {
           await maybeTriggerRollingSummary(messagesRef.current, sessionIdRef.current);
         }
+        maybeExtractMemories(chatSpaceId, messagesRef.current, characterModelSettings || getModelSettings());
         updateSessionStatus(reply.nextStatus || "idle", chatSpaceId);
       } else {
         updateSessionStatus(reply.nextStatus || "failed", chatSpaceId);
@@ -1638,6 +1902,99 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
   const closeBlockedNoteDialog = () => {
     setBlockedNoteDialog(null);
     setNoteText("");
+  };
+
+  // --- Voice / STT ---
+
+  const handleVoiceInput = async () => {
+    if (voiceActive) return;
+    setVoiceActive(true);
+    setVoiceError("");
+    const { startListening } = await import("../services/sttService.js");
+    const result = await startListening();
+    if (result.text) {
+      setInput((prev) => prev + result.text);
+    }
+    if (result.error) {
+      setVoiceError(result.error);
+      setTimeout(() => setVoiceError(""), 3000);
+    }
+    setVoiceActive(false);
+  };
+
+  const handleGenerateImage = async () => {
+    if (generateLoading) return;
+    if (generateOpen) {
+      setGenerateOpen(false);
+      return;
+    }
+    setGenerateOpen(true);
+    setGeneratePrompt("");
+  };
+
+  const submitGenerateImage = async () => {
+    const prompt = generatePrompt.trim();
+    if (!prompt || generateLoading) return;
+
+    setGenerateLoading(true);
+    setGenerateOpen(false);
+
+    const settings = characterModelSettings || getModelSettings();
+    if (!settings.apiKey) {
+      setPlaceholderNotice("请先在设置里填写 API Key");
+      setGenerateLoading(false);
+      return;
+    }
+
+    try {
+      const imageUrl = await generateImage({ prompt, settings });
+
+      const imgMessage = makeUiMessage({
+        role: "user",
+        content: prompt,
+        imageUrl,
+        conversationId: activeChatSpaceRef.current,
+        chatSpaceId: activeChatSpaceRef.current,
+        meta: { source: "ai_generation" },
+      });
+
+      appendMessage(imgMessage);
+
+      if (isPersistedChatSpace(activeChatSpaceRef.current)) {
+        insertMessage(imgMessage).catch(() => {});
+      }
+
+      scrollToBottom("smooth");
+    } catch (err) {
+      setPlaceholderNotice(err.message || "生图失败");
+      setTimeout(() => setPlaceholderNotice(""), 3000);
+    } finally {
+      setGenerateLoading(false);
+      setGeneratePrompt("");
+    }
+  };
+
+  // --- Voice / TTS ---
+
+  const handleSpeakMessage = async (message) => {
+    if (message.role !== "assistant") return;
+    if (playingMessageId === message.id) {
+      const { stopSpeaking } = await import("../services/voiceService.js");
+      stopSpeaking();
+      setPlayingMessageId(null);
+      return;
+    }
+    setPlayingMessageId(message.id);
+    const { speak } = await import("../services/voiceService.js");
+    const voiceId = characterVoiceId || undefined;
+    const voiceApiKey = characterVoiceApiKey || characterModelSettings?.apiKey;
+    const cleanText = (message.content || "").replace(/\[voice\]/gi, "").trim();
+    const result = await speak(cleanText, { voiceId, apiKey: voiceApiKey });
+    setPlayingMessageId(null);
+    if (result?.error) {
+      setPlaceholderNotice(result.error);
+      setTimeout(() => setPlaceholderNotice(""), 3000);
+    }
   };
 
   const submitBlockedNote = async () => {
@@ -1724,6 +2081,9 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
   };
 
   const displayNames = getDisplayNames(uiSettings);
+  if (characterName) {
+    displayNames.assistant = characterName;
+  }
   const avatarImages = {
     assistant: uiSettings.duAvatarImage || "",
     user: uiSettings.userAvatarImage || "",
@@ -1781,6 +2141,17 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
   return (
     <section className="chat-root" style={getChatRootStyle(uiSettings)}>
       <header className="chat-header">
+        {onBack && (
+          <button
+            className="chat-icon-button"
+            type="button"
+            onClick={onBack}
+            aria-label="返回聊天列表"
+            style={{ marginRight: 4, fontSize: 18 }}
+          >
+            ←
+          </button>
+        )}
         <button
           className={`du-avatar-button${hasEmotionUpdate ? " has-emotion-update" : ""}`}
           type="button"
@@ -1803,26 +2174,83 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
           <span className={typing || isSending ? "is-typing" : ""}>{headerStatusText}</span>
         </div>
         <div className="chat-header-actions">
-          <button
-            className="chat-icon-button"
-            type="button"
-            onClick={openKeepsakePage}
-            aria-label="潮汐标本"
-          >
-            <KeepsakeIcon />
-          </button>
-          <button className="ghost-button" type="button" onClick={() => setDrawerOpen(true)}>
-            记忆
-          </button>
+          {!(characterId || (propChatSpaceId && propChatSpaceId.startsWith("char_"))) && (
+            <>
+              <button
+                className="chat-icon-button"
+                type="button"
+                onClick={openKeepsakePage}
+                aria-label="潮汐标本"
+              >
+                <KeepsakeIcon />
+              </button>
+              <button className="ghost-button" type="button" onClick={() => setDrawerOpen(true)}>
+                记忆
+              </button>
+            </>
+          )}
           <button className="chat-icon-button" type="button" onClick={() => setHistoryOpen(true)} aria-label="查找聊天记录">
             <HistoryIcon />
           </button>
-          <button className="chat-icon-button" type="button" onClick={onOpenFunction} aria-label="功能页">
-            <FunctionIcon />
-          </button>
-          <button className="chat-icon-button" type="button" onClick={onOpenSettings} aria-label="设置">
-            <SettingsIcon />
-          </button>
+          {(characterId || (propChatSpaceId && propChatSpaceId.startsWith("char_"))) && (
+            <>
+              <button
+                type="button"
+                onClick={() => setCharacterSettingsOpen(true)}
+                style={{
+                  fontSize: 10,
+                  color: characterVoiceMode === "auto" ? "#fff" : "var(--text-sub)",
+                  background: characterVoiceMode === "auto" ? "var(--accent-cold)" : "var(--panel-soft-bg)",
+                  border: "1px solid var(--border-color)",
+                  padding: "2px 6px",
+                  borderRadius: 4,
+                  marginRight: 4,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                {characterVoiceMode === "auto" ? "语音ON" : "语音OFF"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const next = verbosity === "long" ? "short" : "long";
+                  setVerbosity(next);
+                  if (typeof window !== "undefined") {
+                    window.localStorage.setItem("dukou:verbosity", next);
+                  }
+                }}
+                style={{
+                  fontSize: 10,
+                  color: verbosity === "long" ? "#fff" : "var(--text-sub)",
+                  background: verbosity === "long" ? "var(--accent-warm)" : "var(--panel-soft-bg)",
+                  border: "1px solid var(--border-color)",
+                  padding: "2px 6px",
+                  borderRadius: 4,
+                  marginRight: 4,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                {verbosity === "long" ? "长篇" : "短句"}
+              </button>
+              {characterId && (
+                <button className="chat-icon-button" type="button" onClick={() => setCharacterSettingsOpen(true)} aria-label="角色模型设置">
+                  <SettingsIcon />
+                </button>
+              )}
+            </>
+          )}
+          {onOpenFunction && (
+            <button className="chat-icon-button" type="button" onClick={onOpenFunction} aria-label="功能页">
+              <FunctionIcon />
+            </button>
+          )}
+          {onOpenSettings && (
+            <button className="chat-icon-button" type="button" onClick={onOpenSettings} aria-label="设置">
+              <SettingsIcon />
+            </button>
+          )}
         </div>
       </header>
 
@@ -1927,31 +2355,35 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
           </div>
         )}
         {grouped.map((message) => (
-          <Bubble
-            key={message.id}
-            message={message}
-            messageRef={(node) => {
-              if (node) {
-                messageRefs.current[message.id] = node;
-              } else {
-                delete messageRefs.current[message.id];
-              }
-            }}
-            showAvatar={!message.hideAvatar}
-            highlighted={highlightedMessageId === message.id}
-            selectable={selectionMode}
-            selected={selectedMessageIds.includes(message.id)}
-            onQuote={() => setActiveQuote(quoteFromMessage(message, displayNames))}
-            onJumpToQuote={jumpToMessage}
-            onToggleReasoning={() => toggleReasoning(message.id)}
-            onSelect={() => toggleSelectedMessage(message.id)}
-            onLongPress={() => startMessageSelection(message.id)}
-            displayNames={displayNames}
-            avatarImages={avatarImages}
-            avatarOpacities={avatarOpacities}
-            onBlockedMessageAction={openBlockedNoteDialog}
-            moreActions={!selectionMode && !editingUserMessage && message.id === lastActionableMessageId ? recentMessageActions : []}
-          />
+          <div key={message.id} style={{ position: "relative" }}>
+            <Bubble
+              message={message}
+              messageRef={(node) => {
+                if (node) {
+                  messageRefs.current[message.id] = node;
+                } else {
+                  delete messageRefs.current[message.id];
+                }
+              }}
+              showAvatar={!message.hideAvatar}
+              highlighted={highlightedMessageId === message.id}
+              selectable={selectionMode}
+              selected={selectedMessageIds.includes(message.id)}
+              onQuote={() => setActiveQuote(quoteFromMessage(message, displayNames))}
+              onJumpToQuote={jumpToMessage}
+              onToggleReasoning={() => toggleReasoning(message.id)}
+              onSelect={() => toggleSelectedMessage(message.id)}
+              onLongPress={() => startMessageSelection(message.id)}
+              displayNames={displayNames}
+              avatarImages={avatarImages}
+              avatarOpacities={avatarOpacities}
+              onBlockedMessageAction={openBlockedNoteDialog}
+              moreActions={!selectionMode && !editingUserMessage && message.id === lastActionableMessageId ? recentMessageActions : []}
+              voiceId={characterVoiceId}
+              voiceApiKey={characterVoiceApiKey || characterModelSettings?.apiKey}
+              onSaveImage={handleSaveImage}
+            />
+          </div>
         ))}
         {typing && <TypingDots />}
         <div ref={endRef} />
@@ -2031,7 +2463,62 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
         disabledLabel={inputDisabledLabel}
         placeholder={activeChatSpaceId === "model_test" ? "试一段模型语气..." : "说点什么..."}
         displayNames={displayNames}
+        onVoiceInput={handleVoiceInput}
+        voiceEnabled={characterSttEnabled || false}
+        voiceActive={voiceActive}
+        onImageSelect={setPendingImage}
+        pendingImage={pendingImage}
+        onClearImage={() => setPendingImage("")}
+        onGenerateImage={handleGenerateImage}
       />
+      {voiceError && <div className="placeholder-toast">{voiceError}</div>}
+      {generateOpen && (
+        <div className="chat-confirm-layer" role="presentation" onClick={() => { setGenerateOpen(false); setGeneratePrompt(""); }}>
+          <section
+            className="chat-confirm-dialog"
+            role="dialog"
+            aria-label="AI 生图"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 style={{ marginBottom: 10 }}>AI 生图</h2>
+            <textarea
+              value={generatePrompt}
+              onChange={(e) => setGeneratePrompt(e.target.value)}
+              placeholder="描述你想要的画面……"
+              rows={3}
+              autoFocus
+              style={{
+                width: "100%",
+                resize: "vertical",
+                border: "1px solid var(--border-color)",
+                borderRadius: 8,
+                outline: 0,
+                background: "var(--panel-bg)",
+                color: "var(--text-main)",
+                fontSize: 13,
+                lineHeight: 1.7,
+                padding: "8px 10px",
+                fontFamily: "inherit",
+                boxSizing: "border-box",
+                marginBottom: 12,
+              }}
+            />
+            <div className="chat-confirm-actions">
+              <button type="button" onClick={() => { setGenerateOpen(false); setGeneratePrompt(""); }}>
+                取消
+              </button>
+              <button
+                type="button"
+                className="is-primary"
+                onClick={submitGenerateImage}
+                disabled={generateLoading || !generatePrompt.trim()}
+              >
+                {generateLoading ? "生成中..." : "生成"}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
       {confirmDialog && (
         <div className="chat-confirm-layer" role="presentation" onClick={() => setConfirmDialog(null)}>
           <section
@@ -2175,6 +2662,13 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
         </div>
       )}
       {historyOpen && <ChatHistoryOverlay onClose={() => setHistoryOpen(false)} displayNames={displayNames} avatarImages={avatarImages} avatarOpacities={avatarOpacities} />}
+      {characterSettingsOpen && (
+        <CharacterModelSettings
+          characterId={characterId}
+          onSaved={onCharacterSettingsSaved}
+          onClose={() => setCharacterSettingsOpen(false)}
+        />
+      )}
       <MemoryDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
     </section>
   );

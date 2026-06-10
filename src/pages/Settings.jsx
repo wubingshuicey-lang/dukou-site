@@ -4,6 +4,7 @@ import { getEmotionState, getInjectedMemories } from "../api/memory.js";
 import { exportMessagesJson, getMessageArchiveStats } from "../api/messageArchive.js";
 import { clearLocalMessages, getRecentMessages } from "../api/messages.js";
 import {
+  DEFAULT_ELEVENLABS_SETTINGS,
   DEFAULT_MEMORY_SETTINGS,
   DEFAULT_MODEL_SETTINGS,
   DEFAULT_PROMPT_SETTINGS,
@@ -669,7 +670,10 @@ async function copyText(text) {
 }
 
 
-function CurrentModelCard({ settings, modelStatus, onTest }) {
+function CurrentModelCard({ settings, modelStatus, onTest, onToggleTransport }) {
+  const chatTransport = settings.transport?.chatTransport || DEFAULT_TRANSPORT_SETTINGS.chatTransport;
+  const isMock = chatTransport === "mock";
+
   return (
     <section className="settings-model-card">
       <div className="settings-model-card-head">
@@ -691,8 +695,15 @@ function CurrentModelCard({ settings, modelStatus, onTest }) {
       </div>
       <div className="settings-model-meta">
         <span>Chat Transport</span>
-        <strong>{settings.transport?.chatTransport || DEFAULT_TRANSPORT_SETTINGS.chatTransport}</strong>
+        <strong>{chatTransport}</strong>
       </div>
+      <button
+        className={isMock ? "transport-quick-toggle is-mock" : "transport-quick-toggle is-live"}
+        type="button"
+        onClick={() => onToggleTransport?.(isMock ? "direct_model" : "mock")}
+      >
+        {isMock ? "⚡ 切换到真实模型" : "真实模型 · 点击切回 Mock"}
+      </button>
       <div className="settings-model-meta">
         <span>Memory Mode</span>
         <strong>{settings.memory.memoryMode}</strong>
@@ -706,7 +717,7 @@ function CurrentModelCard({ settings, modelStatus, onTest }) {
   );
 }
 
-function SettingsHome({ settings, modelStatus, homeScrollTop = 0, onHomeScrollChange, onOpen, onTest, onToggleTheme }) {
+function SettingsHome({ settings, modelStatus, homeScrollTop = 0, onHomeScrollChange, onOpen, onTest, onToggleTheme, onToggleTransport }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
   const scrollRef = useRef(null);
@@ -744,6 +755,7 @@ function SettingsHome({ settings, modelStatus, homeScrollTop = 0, onHomeScrollCh
     { id: "memory", title: "记忆与上下文", sub: "Memory Mode、Chat Transport、上下文预览", keywords: "mock direct_model kiwi backend gateway 注入日志 context logs manual preview recent messages" },
     { id: "security", title: "安全与数据", sub: "清除密钥、清空日志、导出聊天记录 JSON", keywords: "api key 清除 日志 导出 debug json 聊天记录 history archive" },
     { id: "appearance", title: "外观", sub: "主题、头像、聊天背景、顶端栏、输入框", keywords: "主题 dark light 夜间 日间 头像 背景 顶端栏 输入框 透明度 磨砂" },
+    { id: "elevenlabs", title: "ElevenLabs 语音", sub: "TTS API Key、Voice ID、参数", keywords: "elevenlabs tts 语音 voice api key stability" },
     { id: "about", title: "关于", sub: "版本信息", keywords: "dukou 版本 version" },
   ];
   const runtimeEntries = [
@@ -766,7 +778,7 @@ function SettingsHome({ settings, modelStatus, homeScrollTop = 0, onHomeScrollCh
         <h1>设</h1>
       </div>
       <div className="settings-scroll" ref={scrollRef} onScroll={rememberScroll}>
-        <CurrentModelCard settings={settings} modelStatus={modelStatus} onTest={onTest} />
+        <CurrentModelCard settings={settings} modelStatus={modelStatus} onTest={onTest} onToggleTransport={onToggleTransport} />
         <section className="settings-section">
           <div className="settings-section-title settings-section-title-row">
             <span>设置</span>
@@ -819,11 +831,13 @@ function SettingsHome({ settings, modelStatus, homeScrollTop = 0, onHomeScrollCh
   );
 }
 
-function ModelSettingsPage({ settings, modelStatus, onBack, onRequestLeave, onSave, onTest, showToast }) {
+function ModelSettingsPage({ settings, modelStatus, onBack, onRequestLeave, onSave, onTest, showToast, onToggleTransport }) {
   const [draft, setDraft] = useState(settings.model);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const dirty = JSON.stringify(draft) !== JSON.stringify(settings.model);
   const apiKeyDisabled = draft.provider === "kiwi_local";
+  const chatTransport = settings.transport?.chatTransport || DEFAULT_TRANSPORT_SETTINGS.chatTransport;
+  const isMock = chatTransport === "mock";
 
   const updateDraft = (patch) => {
     setDraft((current) => ({ ...current, ...patch }));
@@ -859,7 +873,23 @@ function ModelSettingsPage({ settings, modelStatus, onBack, onRequestLeave, onSa
     <>
       <SubHeader title="模型接入" onBack={() => onRequestLeave(dirty, onBack)} actionLabel="保存" onAction={save} />
       <div className="settings-scroll">
-        <CurrentModelCard settings={{ ...settings, model: draft }} modelStatus={modelStatus} onTest={() => onTest(draft)} />
+        <Section title="传输模式">
+          <Row label="Chat Transport" sub={isMock ? "Mock 模式不会请求真实模型，测试和聊天都返回假回复" : "真实模型模式，需要填写 API Key"}>
+            <Segmented
+              value={chatTransport}
+              options={["mock", "direct_model"]}
+              labels={{ mock: "Mock", direct_model: "真实模型" }}
+              onChange={(value) => onToggleTransport?.(value)}
+              label="Chat Transport"
+            />
+          </Row>
+          {isMock && (
+            <InlineNotice tone="neutral">
+              当前是 Mock 模式，所有聊天和测试都返回假回复。切换为「真实模型」后需填写下方 API Key。
+            </InlineNotice>
+          )}
+        </Section>
+        <CurrentModelCard settings={{ ...settings, model: draft }} modelStatus={modelStatus} onTest={() => onTest(draft)} onToggleTransport={onToggleTransport} />
         <Section title="接入">
           <Row label="Provider">
             <select className="settings-control" value={draft.provider} onChange={(event) => changeProvider(event.target.value)}>
@@ -1903,6 +1933,118 @@ function SettingsConfirmDialog({ dialog, onCancel, onConfirm, onInputChange }) {
     </div>
   );
 }
+function ElevenLabsSettingsPage({ settings, onBack, onRequestLeave, onSave, showToast }) {
+  const [draft, setDraft] = useState(settings.elevenlabs || DEFAULT_ELEVENLABS_SETTINGS);
+  const dirty = JSON.stringify(draft) !== JSON.stringify(settings.elevenlabs || DEFAULT_ELEVENLABS_SETTINGS);
+  const [testing, setTesting] = useState(false);
+  const [ttsResult, setTtsResult] = useState(null);
+
+  const updateDraft = (patch) => { setDraft((c) => ({ ...c, ...patch })); };
+
+  const save = () => {
+    onSave(draft);
+    showToast("已保存");
+  };
+
+  async function testTts() {
+    setTesting(true);
+    setTtsResult(null);
+
+    if (!draft.apiKey) {
+      setTtsResult({ ok: false, text: "请先填写 API Key" });
+      setTesting(false);
+      return;
+    }
+    if (!draft.voiceId) {
+      setTtsResult({ ok: false, text: "请先填写 Voice ID" });
+      setTesting(false);
+      return;
+    }
+
+    try {
+      const { speak } = await import("../services/voiceService.js");
+      const { stopSpeaking } = await import("../services/voiceService.js");
+      stopSpeaking();
+      const result = await speak("你好，这是渡口的语音测试。", { apiKey: draft.apiKey, voiceId: draft.voiceId });
+      if (result?.error) {
+        setTtsResult({ ok: false, text: result.error });
+      } else {
+        setTtsResult({ ok: true, text: "播放成功" });
+      }
+    } catch (err) {
+      setTtsResult({ ok: false, text: err.message || "TTS 测试失败" });
+    }
+    setTesting(false);
+  }
+
+  return (
+    <>
+      <SubHeader title="ElevenLabs 语音" onBack={() => onRequestLeave(dirty, onBack)} actionLabel="保存" onAction={save} />
+      <div className="settings-scroll">
+        <InlineNotice>ElevenLabs 用于角色 TTS 语音播报。API Key 只保存在本浏览器，不经过后端。</InlineNotice>
+        <Section title="接入">
+          <Row label="API Key">
+            <input
+              className="settings-control"
+              type="password"
+              value={draft.apiKey || ""}
+              onChange={(e) => updateDraft({ apiKey: e.target.value })}
+              placeholder="sk_..."
+            />
+          </Row>
+          <Row label="默认 Voice ID">
+            <input
+              className="settings-control"
+              value={draft.voiceId || ""}
+              onChange={(e) => updateDraft({ voiceId: e.target.value })}
+              placeholder="角色可单独覆盖"
+            />
+          </Row>
+          <Row label="">
+            <button
+              className="charm-test-btn"
+              type="button"
+              onClick={testTts}
+              disabled={testing}
+            >
+              {testing ? "测试中..." : "测试 TTS"}
+            </button>
+            {ttsResult && (
+              <span className={`charm-test-result ${ttsResult.ok ? "success" : "fail"}`} style={{ marginLeft: 8 }}>
+                {ttsResult.ok ? "✓" : "✗"} {ttsResult.text}
+              </span>
+            )}
+          </Row>
+        </Section>
+        <Section title="语音参数">
+          <Row label="Stability" sub={String(draft.stability ?? 0.5)}>
+            <input
+              className="settings-control"
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={draft.stability ?? 0.5}
+              onChange={(e) => updateDraft({ stability: Number(e.target.value) })}
+            />
+          </Row>
+          <Row label="Similarity Boost" sub={String(draft.similarityBoost ?? 0.75)}>
+            <input
+              className="settings-control"
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={draft.similarityBoost ?? 0.75}
+              onChange={(e) => updateDraft({ similarityBoost: Number(e.target.value) })}
+            />
+          </Row>
+        </Section>
+      </div>
+    </>
+  );
+}
+
 function AboutPage({ onBack }) {
   return (
     <>
@@ -2176,6 +2318,16 @@ export default function Settings() {
     persist({ ...settings, ui: { ...settings.ui, theme } });
   };
 
+  const toggleTransport = (nextTransport) => {
+    if (!nextTransport) return;
+    persist({
+      ...settings,
+      transport: { ...settings.transport, chatTransport: nextTransport },
+    });
+    setModelStatus({ status: "untested", message: "" });
+    showToast(nextTransport === "direct_model" ? "已切换到真实模型" : "已切换到 Mock");
+  };
+
   return (
     <section className="settings-root">
       {page === "home" && (
@@ -2187,6 +2339,7 @@ export default function Settings() {
           onOpen={setPage}
           onTest={() => runModelTest(settings.model)}
           onToggleTheme={toggleTheme}
+          onToggleTransport={toggleTransport}
         />
       )}
       {page === "model" && (
@@ -2201,6 +2354,7 @@ export default function Settings() {
           }}
           onTest={runModelTest}
           showToast={showToast}
+          onToggleTransport={toggleTransport}
         />
       )}
       {page === "persona" && (
@@ -2271,6 +2425,15 @@ export default function Settings() {
           onClearModelKey={clearModelKey}
           onClearLogs={clearAllLogs}
           onClearMessages={clearMessages}
+          showToast={showToast}
+        />
+      )}
+      {page === "elevenlabs" && (
+        <ElevenLabsSettingsPage
+          settings={settings}
+          onBack={() => setPage("home")}
+          onRequestLeave={requestLeaveConfirm}
+          onSave={(elevenlabs) => persist({ ...settings, elevenlabs })}
           showToast={showToast}
         />
       )}
