@@ -2468,7 +2468,7 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
         placeholder={activeChatSpaceId === "model_test" ? "试一段模型语气..." : "说点什么..."}
         displayNames={displayNames}
         onVoiceInput={handleVoiceInput}
-        voiceEnabled={characterSttEnabled || false}
+        voiceEnabled={true}
         voiceActive={voiceActive}
         onImageSelect={setPendingImage}
         pendingImage={pendingImage}
