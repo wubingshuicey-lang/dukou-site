@@ -929,39 +929,33 @@ function ModelSettingsPage({ settings, modelStatus, onBack, onRequestLeave, onSa
             <input className="settings-control" value={draft.baseUrl} onChange={(event) => updateDraft({ baseUrl: event.target.value })} />
           </Row>
           <Row label="Model">
-            {(() => {
-              const isCustomModel = !COMMON_MODELS.includes(draft.model) && draft.model;
-              return (
-                <>
-                  <select
-                    className="settings-control"
-                    value={isCustomModel ? "__custom__" : draft.model}
-                    onChange={(event) => {
-                      if (event.target.value === "__custom__") {
-                        updateDraft({ model: "" });
-                      } else {
-                        updateDraft({ model: event.target.value });
-                      }
-                    }}
-                  >
-                    <option value="">-- 选择模型 --</option>
-                    {COMMON_MODELS.map((m) => (
-                      <option key={m} value={m}>{m}</option>
-                    ))}
-                    <option value="__custom__">其他（手动输入）</option>
-                  </select>
-                  {(isCustomModel || draft.model === "" && draft.provider) && (
-                    <input
-                      className="settings-control"
-                      style={{ marginTop: 6 }}
-                      value={draft.model}
-                      onChange={(event) => updateDraft({ model: event.target.value })}
-                      placeholder="输入模型 ID..."
-                    />
-                  )}
-                </>
-              );
-            })()}
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <select
+                className="settings-control"
+                value={COMMON_MODELS.includes(draft.model) ? draft.model : (draft.model ? "__custom__" : "")}
+                onChange={(event) => {
+                  if (event.target.value === "__custom__") {
+                    // keep current custom model value, user can edit below
+                  } else {
+                    updateDraft({ model: event.target.value });
+                  }
+                }}
+              >
+                <option value="">-- 选择模型 --</option>
+                {COMMON_MODELS.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+                <option value="__custom__">其他（手动输入）</option>
+              </select>
+              {(!COMMON_MODELS.includes(draft.model) && draft.model) && (
+                <input
+                  className="settings-control"
+                  value={draft.model}
+                  onChange={(event) => updateDraft({ model: event.target.value })}
+                  placeholder="输入模型 ID..."
+                />
+              )}
+            </div>
           </Row>
           <Row label="API Key" sub={apiKeyDisabled ? "Kiwi Local 不在前端保存真实模型 key" : ""}>
             <input
