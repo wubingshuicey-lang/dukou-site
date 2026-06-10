@@ -22,6 +22,7 @@ import { getSessionId } from "../store/session.js";
 import { DEFAULT_SYSTEM_PROMPT, buildContextPreview, buildSystemPrompt } from "../systems/context.js";
 
 const providerOptions = [
+  ["zenmux", "ZenMux (综合)"],
   ["deepseek", "DeepSeek"],
   ["kimi", "Kimi"],
   ["glm", "GLM"],

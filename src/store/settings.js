@@ -14,6 +14,12 @@ export const STORAGE_KEYS = {
 };
 
 export const PROVIDER_PRESETS = {
+  zenmux: {
+    label: "ZenMux",
+    apiStyle: "openai_compatible",
+    baseUrl: "https://zenmux.ai/api/v1",
+    defaultModel: "gpt-4o",
+  },
   deepseek: {
     label: "DeepSeek",
     apiStyle: "openai_compatible",

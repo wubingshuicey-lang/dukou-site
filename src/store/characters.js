@@ -73,6 +73,7 @@ const DEFAULT_CHARACTERS = [
 
 export const MODEL_PROVIDER_OPTIONS = [
   { id: "", label: "使用全局设置" },
+  { id: "zenmux", label: "ZenMux (综合)", baseUrl: "https://zenmux.ai/api/v1", defaultModel: "gpt-4o", apiStyle: "openai_compatible" },
   { id: "deepseek", label: "DeepSeek", baseUrl: "https://api.deepseek.com", defaultModel: "deepseek-chat", apiStyle: "openai_compatible" },
   { id: "openai", label: "OpenAI", baseUrl: "https://api.openai.com/v1", defaultModel: "gpt-4o-mini", apiStyle: "openai_compatible" },
   { id: "claude", label: "Claude", baseUrl: "https://api.anthropic.com", defaultModel: "claude-sonnet-4-20250514", apiStyle: "anthropic" },
