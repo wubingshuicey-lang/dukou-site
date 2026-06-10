@@ -854,9 +854,6 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
   const [voiceActive, setVoiceActive] = useState(false);
   const [voiceError, setVoiceError] = useState("");
   const [playingMessageId, setPlayingMessageId] = useState(null);
-  const [generateOpen, setGenerateOpen] = useState(false);
-  const [generatePrompt, setGeneratePrompt] = useState("");
-  const [generateLoading, setGenerateLoading] = useState(false);
   const [uiSettings, setUiSettings] = useState(() => getSettings().ui);
   const endRef = useRef(null);
   const messageListRef = useRef(null);
@@ -1981,58 +1978,6 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
     setVoiceActive(false);
   };
 
-  const handleGenerateImage = async () => {
-    if (generateLoading) return;
-    if (generateOpen) {
-      setGenerateOpen(false);
-      return;
-    }
-    setGenerateOpen(true);
-    setGeneratePrompt("");
-  };
-
-  const submitGenerateImage = async () => {
-    const prompt = generatePrompt.trim();
-    if (!prompt || generateLoading) return;
-
-    setGenerateLoading(true);
-    setGenerateOpen(false);
-
-    const settings = characterModelSettings || getModelSettings();
-    if (!settings.apiKey) {
-      setPlaceholderNotice("请先在设置里填写 API Key");
-      setGenerateLoading(false);
-      return;
-    }
-
-    try {
-      const imageUrl = await generateImage({ prompt, settings });
-
-      const imgMessage = makeUiMessage({
-        role: "user",
-        content: prompt,
-        imageUrl,
-        conversationId: activeChatSpaceRef.current,
-        chatSpaceId: activeChatSpaceRef.current,
-        meta: { source: "ai_generation" },
-      });
-
-      appendMessage(imgMessage);
-
-      if (isPersistedChatSpace(activeChatSpaceRef.current)) {
-        insertMessage(imgMessage).catch(() => {});
-      }
-
-      scrollToBottom("smooth");
-    } catch (err) {
-      setPlaceholderNotice(err.message || "生图失败");
-      setTimeout(() => setPlaceholderNotice(""), 3000);
-    } finally {
-      setGenerateLoading(false);
-      setGeneratePrompt("");
-    }
-  };
-
   // --- Voice / TTS ---
 
   const handleSpeakMessage = async (message) => {
@@ -2528,56 +2473,8 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
         onImageSelect={setPendingImage}
         pendingImage={pendingImage}
         onClearImage={() => setPendingImage("")}
-        onGenerateImage={handleGenerateImage}
       />
       {voiceError && <div className="placeholder-toast">{voiceError}</div>}
-      {generateOpen && (
-        <div className="chat-confirm-layer" role="presentation" onClick={() => { setGenerateOpen(false); setGeneratePrompt(""); }}>
-          <section
-            className="chat-confirm-dialog"
-            role="dialog"
-            aria-label="AI 生图"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <h2 style={{ marginBottom: 10 }}>AI 生图</h2>
-            <textarea
-              value={generatePrompt}
-              onChange={(e) => setGeneratePrompt(e.target.value)}
-              placeholder="描述你想要的画面……"
-              rows={3}
-              autoFocus
-              style={{
-                width: "100%",
-                resize: "vertical",
-                border: "1px solid var(--border-color)",
-                borderRadius: 8,
-                outline: 0,
-                background: "var(--panel-bg)",
-                color: "var(--text-main)",
-                fontSize: 13,
-                lineHeight: 1.7,
-                padding: "8px 10px",
-                fontFamily: "inherit",
-                boxSizing: "border-box",
-                marginBottom: 12,
-              }}
-            />
-            <div className="chat-confirm-actions">
-              <button type="button" onClick={() => { setGenerateOpen(false); setGeneratePrompt(""); }}>
-                取消
-              </button>
-              <button
-                type="button"
-                className="is-primary"
-                onClick={submitGenerateImage}
-                disabled={generateLoading || !generatePrompt.trim()}
-              >
-                {generateLoading ? "生成中..." : "生成"}
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
       {confirmDialog && (
         <div className="chat-confirm-layer" role="presentation" onClick={() => setConfirmDialog(null)}>
           <section

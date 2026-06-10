@@ -85,14 +85,6 @@ function CallIcon() {
   );
 }
 
-function SparkleIcon() {
-  return (
-    <svg viewBox="0 0 18 18" aria-hidden="true">
-      <path d="M9 2.5l.8 3.2c.2.8.8 1.4 1.6 1.6l3.1.7-3.1.7c-.8.2-1.4.8-1.6 1.6L9 13.5l-.8-3.2c-.2-.8-.8-1.4-1.6-1.6l-3.1-.7 3.1-.7c.8-.2 1.4-.8 1.6-1.6L9 2.5z" />
-    </svg>
-  );
-}
-
 export default function MessageInput({
   value,
   quote,
@@ -110,7 +102,6 @@ export default function MessageInput({
   onImageSelect,
   pendingImage,
   onClearImage,
-  onGenerateImage,
 }) {
   const [toolsOpen, setToolsOpen] = useState(false);
   const fileInputRef = useRef(null);
@@ -118,7 +109,6 @@ export default function MessageInput({
   const hasPendingContent = hasTextContent || Boolean(pendingImage);
   const toolItems = [
     { id: 'image', label: '图片', icon: <ImageIcon /> },
-    { id: 'generate', label: '生图', icon: <SparkleIcon /> },
     { id: 'file', label: '上传文件', icon: <FileIcon /> },
     { id: 'call', label: '电话', icon: <CallIcon /> },
   ];
@@ -126,8 +116,6 @@ export default function MessageInput({
   const selectTool = (id) => {
     if (id === "image") {
       fileInputRef.current?.click();
-    } else if (id === "generate") {
-      onGenerateImage?.();
     } else {
       onToolAction?.(id);
     }

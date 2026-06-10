@@ -358,12 +358,15 @@ export async function loadCloudCharacters() {
     const chars = await fetchCharacters();
     if (Array.isArray(chars) && chars.length) {
       const custom = readCustom();
-      const cloudCustom = chars.filter(c => c.id.startsWith("char_custom_"));
       const merged = [...custom];
-      for (const cc of cloudCustom) {
+      for (const cc of chars) {
         const idx = merged.findIndex(c => c.id === cc.id);
-        if (idx >= 0) merged[idx] = { ...cc, ...merged[idx], isDefault: false };
-        else merged.push({ ...cc, isDefault: false, chatSpaceId: cc.chatSpaceId || cc.id });
+        if (idx >= 0) {
+          // Local override wins for settings, but take cloud data as base
+          merged[idx] = { ...cc, ...merged[idx] };
+        } else {
+          merged.push({ ...cc, chatSpaceId: cc.chatSpaceId || cc.id });
+        }
       }
       writeCustom(merged);
     }

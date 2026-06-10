@@ -17,8 +17,10 @@ export default function App() {
 
   useEffect(() => {
     if (screen !== "login") {
-      loadCloudSettings().catch(() => {});
-      loadCloudCharacters().catch(() => {});
+      (async () => {
+        await loadCloudSettings().catch(() => {});
+        await loadCloudCharacters().catch(() => {});
+      })();
     }
   }, [screen]);
 

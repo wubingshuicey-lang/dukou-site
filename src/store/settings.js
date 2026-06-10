@@ -379,7 +379,25 @@ export function saveSettings(settings) {
 export async function loadCloudSettings() {
   if (!isLoggedIn()) return null;
   try {
-    return await fetchSettings();
+    const cloud = await fetchSettings();
+    if (!cloud || !Object.keys(cloud).length) return null;
+
+    // Merge cloud settings into local storage (cloud takes precedence over defaults,
+    // but existing local settings override cloud — user's current device wins)
+    const local = getSettings();
+    const merged = mergeSettings({
+      model: cloud[STORAGE_KEYS.modelSettings] || local.model,
+      memory: cloud[STORAGE_KEYS.memorySettings] || local.memory,
+      transport: cloud[STORAGE_KEYS.transportSettings] || local.transport,
+      ui: cloud[STORAGE_KEYS.uiSettings] || local.ui,
+      prompt: cloud[STORAGE_KEYS.promptSettings] || local.prompt,
+      elevenlabs: cloud[STORAGE_KEYS.elevenlabsSettings] || local.elevenlabs,
+    });
+    persistSplitSettings(merged);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("dukou:settings-changed"));
+    }
+    return merged;
   } catch {
     return null;
   }
