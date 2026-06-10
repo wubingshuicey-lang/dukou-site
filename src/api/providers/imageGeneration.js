@@ -11,20 +11,25 @@ async function readResponseJson(response) {
 }
 
 export async function generateImage({ prompt, settings, signal }) {
-  if (!settings?.apiKey) throw new Error("缺少 API Key");
-  if (!settings?.baseUrl) throw new Error("缺少 Base URL");
+  // Use independent image provider if configured, otherwise fall back to chat provider
+  const apiKey = settings.imageApiKey || settings.apiKey;
+  const baseUrl = settings.imageBaseUrl || settings.baseUrl;
+  const model = settings.imageModel || settings.model || "openai/gpt-image-2";
 
-  const url = `${normalizeBaseUrl(settings.baseUrl)}/images/generations`;
+  if (!apiKey) throw new Error("缺少 API Key");
+  if (!baseUrl) throw new Error("缺少 Base URL");
+
+  const url = `${normalizeBaseUrl(baseUrl)}/images/generations`;
 
   const response = await fetch(url, {
     method: "POST",
     signal,
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${settings.apiKey}`,
+      Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: settings.imageModel || settings.model || "openai/gpt-image-2",
+      model,
       prompt,
       n: 1,
       size: "1024x1024",

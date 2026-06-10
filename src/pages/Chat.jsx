@@ -1150,7 +1150,13 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
   };
 
   const generateImagesForReply = async (imagePrompts, chatSpaceId, persist) => {
-    const settings = characterModelSettings || getModelSettings();
+    const chatSettings = characterModelSettings || getModelSettings();
+    // Merge independent image provider settings with chat settings
+    const settings = {
+      ...chatSettings,
+      apiKey: chatSettings.imageApiKey || chatSettings.apiKey,
+      baseUrl: chatSettings.imageBaseUrl || chatSettings.baseUrl,
+    };
     if (!settings.apiKey) {
       setModelError({ type: "warn", message: "缺少 API Key，无法生成图片" });
       return;
@@ -1182,7 +1188,7 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
       } catch (err) {
         setTyping(false);
         const errMsg = err.message || "未知错误";
-        const calledUrl = `${(settings.baseUrl || "").replace(/\/+$/, "")}/images/generations`;
+        const calledUrl = `${(settings.imageBaseUrl || settings.baseUrl || "").replace(/\/+$/, "")}/images/generations`;
         const hint = errMsg.includes("404") || errMsg.includes("Not Found")
           ? ` — 端点不存在，请求了 ${calledUrl}`
           : errMsg.includes("401") || errMsg.includes("403")

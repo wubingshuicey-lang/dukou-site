@@ -79,6 +79,9 @@ export const DEFAULT_MODEL_SETTINGS = {
   // Per-capability model overrides: if empty, falls back to `model`
   chatModel: "",
   imageModel: "openai/gpt-image-2",
+  imageProvider: "",
+  imageApiKey: "",
+  imageBaseUrl: "",
   sttModel: "whisper-1",
   ttsModel: "tts-1",
   temperature: 0.8,

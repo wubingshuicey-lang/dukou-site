@@ -959,6 +959,24 @@ function ModelSettingsPage({ settings, modelStatus, onBack, onRequestLeave, onSa
           </Row>
           {draft.provider && draft.provider !== "kiwi_local" && (
             <Section title="模型路由（不同任务自动用不同模型）">
+              <Row label="生图接口（独立，留空跟随聊天）" />
+              <Row label="生图 Base URL">
+                <input
+                  className="settings-control"
+                  value={draft.imageBaseUrl || ""}
+                  onChange={(e) => updateDraft({ imageBaseUrl: e.target.value })}
+                  placeholder="留空则跟随聊天 Base URL"
+                />
+              </Row>
+              <Row label="生图 API Key">
+                <input
+                  className="settings-control"
+                  type="password"
+                  value={draft.imageApiKey || ""}
+                  onChange={(e) => updateDraft({ imageApiKey: e.target.value })}
+                  placeholder="留空则跟随聊天 API Key"
+                />
+              </Row>
               <Row label="生图模型">
                 <select
                   className="settings-control"
