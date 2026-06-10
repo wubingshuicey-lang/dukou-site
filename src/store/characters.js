@@ -216,7 +216,11 @@ function writeCustom(custom) {
 }
 
 export function getAllCharacters() {
-  return [...DEFAULT_CHARACTERS, ...readCustom()];
+  const custom = readCustom();
+  const customIds = new Set(custom.map((c) => c.id));
+  // Default chars that have been customized are replaced by their custom overrides
+  const defaults = DEFAULT_CHARACTERS.filter((d) => !customIds.has(d.id));
+  return [...defaults, ...custom];
 }
 
 export function getCharacter(id) {
@@ -301,15 +305,28 @@ export function createCustomCharacter({
 export function updateCharacter(charId, updates) {
   const custom = readCustom();
   const idx = custom.findIndex((c) => c.id === charId);
-  if (idx === -1) return null;
-  custom[idx] = { ...custom[idx], ...updates };
-  writeCustom(custom);
-
-  if (isLoggedIn()) {
-    updateChar(charId, updates).catch(() => {});
+  if (idx !== -1) {
+    custom[idx] = { ...custom[idx], ...updates };
+    writeCustom(custom);
+    if (isLoggedIn()) {
+      updateChar(charId, updates).catch(() => {});
+    }
+    return custom[idx];
   }
 
-  return custom[idx];
+  // Handle default characters: promote to a custom entry so edits persist
+  const defaultChar = DEFAULT_CHARACTERS.find((c) => c.id === charId);
+  if (defaultChar) {
+    const entry = { ...defaultChar, ...updates };
+    custom.push(entry);
+    writeCustom(custom);
+    if (isLoggedIn()) {
+      updateChar(charId, updates).catch(() => {});
+    }
+    return entry;
+  }
+
+  return null;
 }
 
 export function acceptFriendRequest(charId) {
