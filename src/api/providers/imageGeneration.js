@@ -43,8 +43,16 @@ export async function generateImage({ prompt, settings, signal }) {
     throw new Error(msg);
   }
 
-  const imageUrl = data?.data?.[0]?.url || data?.data?.[0]?.b64_json || "";
-  if (!imageUrl) throw new Error("接口未返回图片");
+  // Try common response formats: OpenAI, Gemini, etc.
+  const imageUrl = data?.data?.[0]?.url
+    || data?.data?.[0]?.b64_json
+    || data?.generated_images?.[0]?.image
+    || data?.images?.[0]
+    || "";
+  if (!imageUrl) {
+    const preview = JSON.stringify(data).slice(0, 300);
+    throw new Error(`接口未返回图片。响应: ${preview}`);
+  }
 
   // If it's a URL (not base64), fetch and convert to data URL for offline persistence
   if (imageUrl.startsWith("http")) {
@@ -58,5 +66,9 @@ export async function generateImage({ prompt, settings, signal }) {
     });
   }
 
-  return imageUrl;
+  // If it's already a base64 data URL, return as-is
+  if (imageUrl.startsWith("data:")) return imageUrl;
+
+  // Raw base64 without prefix — add the prefix
+  return `data:image/png;base64,${imageUrl}`;
 }
