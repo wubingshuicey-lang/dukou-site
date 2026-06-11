@@ -125,12 +125,7 @@ export default function ChatListScreen({ onOpenChat, onBack }) {
                 {char.avatarInitial}
               </div>
               <div className="chatlist-info" style={{ flex: 1 }}>
-                <div className="chatlist-name" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  {char.name}
-                  {blocked && (
-                    <span style={{ fontSize: 10, color: "var(--danger)", fontWeight: 500 }}>已拉黑</span>
-                  )}
-                </div>
+                <div className="chatlist-name">{char.name}</div>
                 <div className="chatlist-preview">{char.description}</div>
               </div>
             </button>
