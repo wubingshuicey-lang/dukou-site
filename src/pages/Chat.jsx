@@ -1632,12 +1632,30 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
           updateSessionStatus(reply.nextStatus || "idle", chatSpaceId);
         }
 
-        // Proactive messages for character spaces: character initiates based on time + background
+        // Proactive messages for character spaces: weighted score system
+        // Scores: cooldown(0-40) + activity(0-30) + timeMatch(0-30) → triggers at 50+
         if (chatSpaceId.startsWith("char_") && readMessages.length > 0) {
           const lastKey = `dukou:lastProactive:${chatSpaceId}`;
           const lastProactive = window.localStorage.getItem(lastKey);
-          const cooldownHours = 2;
-          const shouldProactive = !lastProactive || (Date.now() - Number(lastProactive)) > cooldownHours * 3600 * 1000;
+          const elapsed = lastProactive ? (Date.now() - Number(lastProactive)) / 3600000 : 99; // hours
+          const now = new Date();
+          const hour = now.getHours();
+
+          // Cooldown: longer since last proactive = higher score
+          const cooldownScore = elapsed < 1 ? 0 : elapsed < 2 ? 20 : elapsed < 4 ? 30 : 40;
+
+          // Activity: time since last user message (shorter = they're active, don't interrupt)
+          const lastUserMsg = [...readMessages].reverse().find(m => m.role === "user");
+          const idleHours = lastUserMsg ? (now - new Date(lastUserMsg.created_at)) / 3600000 : 99;
+          const activityScore = idleHours < 0.5 ? 0 : idleHours < 2 ? 15 : idleHours < 6 ? 25 : 30;
+
+          // Time match: how good is current time for natural conversation?
+          const isActiveHour = (hour >= 7 && hour <= 9) || (hour >= 11 && hour <= 13) || (hour >= 19 && hour <= 22);
+          const isNight = hour >= 23 || hour <= 5;
+          const timeScore = isActiveHour ? 30 : isNight ? 5 : 15;
+
+          const totalScore = cooldownScore + activityScore + timeScore;
+          const shouldProactive = !lastProactive || totalScore >= 50;
           if (shouldProactive) {
             const settings = characterModelSettings || getModelSettings();
             if (settings.apiKey) {

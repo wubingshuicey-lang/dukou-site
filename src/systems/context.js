@@ -91,6 +91,10 @@ function buildCharacterBlock(characterPersonality) {
   if (characterPersonality.voiceMode === "auto") {
     parts.push("【语音】用 <say>说出口的话</say> 标记你要说的话，标记部分会变成语音气泡发给对方。动作、心理、场景描写放在标记外面，用纯文字显示。例：<say>好想你</say> 说完脸红了。");
   }
+  // Personality anchor: prevent drift over long conversations
+  if (characterPersonality.name || characterPersonality.personality) {
+    parts.push("【人格锚定】以上是你的核心设定。无论对话多长，始终保持这个身份、性格和说话方式不变。不要因为对话语境逐渐漂移成另一个人。你的背景故事是固定的，不要在对话中编造新的身份信息。");
+  }
   if (parts.length === 0) return "";
   return parts.join("\n") + "\n";
 }
