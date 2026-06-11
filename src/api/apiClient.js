@@ -127,6 +127,18 @@ export async function pushMemories(chatSpaceId, items) {
   });
 }
 
+// --- Vector Memory Search ---
+
+export async function searchMemories(chatSpaceId, query, limit = 5) {
+  let url = `/memories/search/${chatSpaceId}?limit=${limit}`;
+  if (query) url += `&q=${encodeURIComponent(query)}`;
+  return apiFetch(url);
+}
+
+export async function fetchMemoryStats(chatSpaceId) {
+  return apiFetch(`/memories/${chatSpaceId}/stats`);
+}
+
 // --- Messages ---
 
 export async function fetchMessages(chatSpaceId, limit = 50, before = "") {

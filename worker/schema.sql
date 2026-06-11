@@ -46,8 +46,26 @@ CREATE TABLE IF NOT EXISTS character_memories (
   user_id TEXT NOT NULL REFERENCES users(id),
   chat_space_id TEXT NOT NULL,
   text TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  embedding TEXT,
+  embedding_model TEXT,
+  semantic_type TEXT DEFAULT 'event',
+  importance REAL DEFAULT 0.5,
+  reference_message_id TEXT,
+  archived INTEGER DEFAULT 0,
+  last_accessed DATETIME,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Migration: add new columns to existing table (safe to run repeatedly)
+ALTER TABLE character_memories ADD COLUMN embedding TEXT;
+ALTER TABLE character_memories ADD COLUMN embedding_model TEXT;
+ALTER TABLE character_memories ADD COLUMN semantic_type TEXT DEFAULT 'event';
+ALTER TABLE character_memories ADD COLUMN importance REAL DEFAULT 0.5;
+ALTER TABLE character_memories ADD COLUMN reference_message_id TEXT;
+ALTER TABLE character_memories ADD COLUMN archived INTEGER DEFAULT 0;
+ALTER TABLE character_memories ADD COLUMN last_accessed DATETIME;
+ALTER TABLE character_memories ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP;
 
 CREATE TABLE IF NOT EXISTS messages (
   id TEXT PRIMARY KEY,

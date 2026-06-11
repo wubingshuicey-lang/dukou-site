@@ -263,7 +263,7 @@ function rowToCharacter(row) {
   };
 }
 
-// --- Character Memories ---
+// --- Character Memories (改进版 - 支持向量化) ---
 
 app.get("/api/memories/:chatSpaceId", authMiddleware, async (c) => {
   const userId = c.get("userId");
@@ -272,14 +272,66 @@ app.get("/api/memories/:chatSpaceId", authMiddleware, async (c) => {
   const db = c.env.DB;
 
   const rows = await db.prepare(
-    "SELECT * FROM character_memories WHERE user_id = ? AND chat_space_id = ? ORDER BY created_at DESC LIMIT ?"
+    "SELECT * FROM character_memories WHERE user_id = ? AND chat_space_id = ? AND archived = 0 ORDER BY created_at DESC LIMIT ?"
   ).bind(userId, chatSpaceId, limit).all();
 
-  return c.json(rows.results.map(r => ({
-    id: r.id,
-    text: r.text,
-    createdAt: r.created_at,
-  })));
+  return c.json(rows.results.map(rowToMemory));
+});
+
+app.get("/api/memories/search/:chatSpaceId", authMiddleware, async (c) => {
+  const userId = c.get("userId");
+  const chatSpaceId = c.req.param("chatSpaceId");
+  const query = c.req.query("q") || "";
+  const limit = Math.min(Number(c.req.query("limit") || "5"), 20);
+  const db = c.env.DB;
+
+  if (!query.trim()) {
+    const rows = await db.prepare(
+      "SELECT * FROM character_memories WHERE user_id = ? AND chat_space_id = ? AND archived = 0 ORDER BY last_accessed DESC LIMIT ?"
+    ).bind(userId, chatSpaceId, limit).all();
+    return c.json(rows.results.map(rowToMemory));
+  }
+
+  try {
+    // 生成查询向量
+    const queryVector = await generateEmbedding(query, c.env);
+    if (!queryVector) {
+      // 降级到全文搜索
+      const rows = await db.prepare(
+        `SELECT * FROM character_memories 
+         WHERE user_id = ? AND chat_space_id = ? AND archived = 0 
+         AND (text LIKE ? OR text LIKE ?)
+         ORDER BY created_at DESC LIMIT ?`
+      ).bind(userId, chatSpaceId, `%${query}%`, `%${query}%`, limit).all();
+      return c.json(rows.results.map(rowToMemory));
+    }
+
+    // 向量检索
+    const allMemories = await db.prepare(
+      "SELECT * FROM character_memories WHERE user_id = ? AND chat_space_id = ? AND archived = 0 AND embedding IS NOT NULL"
+    ).bind(userId, chatSpaceId).all();
+
+    const scored = allMemories.results
+      .map(mem => ({
+        ...mem,
+        similarity: cosineSimilarity(queryVector, decodeEmbedding(mem.embedding)),
+      }))
+      .sort((a, b) => b.similarity - a.similarity)
+      .slice(0, limit);
+
+    // 更新访问时间
+    const updateStmts = scored.map(mem =>
+      db.prepare("UPDATE character_memories SET last_accessed = datetime('now') WHERE id = ?").bind(mem.id)
+    );
+    if (updateStmts.length > 0) {
+      await db.batch(updateStmts);
+    }
+
+    return c.json(scored.map(rowToMemory));
+  } catch (err) {
+    console.error("向量检索失败:", err);
+    return c.json({ error: "检索失败" }, 500);
+  }
 });
 
 app.post("/api/memories/:chatSpaceId", authMiddleware, async (c) => {
@@ -291,16 +343,76 @@ app.post("/api/memories/:chatSpaceId", authMiddleware, async (c) => {
   const items = Array.isArray(body.items) ? body.items : (body.text ? [{ text: body.text }] : []);
   if (items.length === 0) return c.json({ error: "没有要保存的记忆" }, 400);
 
-  const stmts = items.map(item => {
+  const stmts = [];
+
+  for (const item of items) {
     const id = `mem-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`;
-    return db.prepare(
-      "INSERT INTO character_memories (id, user_id, chat_space_id, text) VALUES (?, ?, ?, ?)"
-    ).bind(id, userId, chatSpaceId, String(item.text || "").trim());
-  });
+    const text = String(item.text || "").trim();
+
+    let embedding = null;
+    try {
+      const vector = await generateEmbedding(text, c.env);
+      if (vector) {
+        embedding = encodeEmbedding(vector);
+      }
+    } catch (err) {
+      console.error("向量化失败:", err);
+    }
+
+    stmts.push(
+      db.prepare(`
+        INSERT INTO character_memories 
+        (id, user_id, chat_space_id, text, embedding, embedding_model, semantic_type, importance, reference_message_id, archived)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        id, userId, chatSpaceId, text,
+        embedding, embedding ? "text-embedding-3-small" : null,
+        item.type || "event",
+        item.importance || 0.5,
+        item.referenceMessageId || null,
+        0
+      )
+    );
+  }
 
   await db.batch(stmts);
   return c.json({ ok: true, count: items.length }, 201);
 });
+
+app.get("/api/memories/:chatSpaceId/stats", authMiddleware, async (c) => {
+  const userId = c.get("userId");
+  const chatSpaceId = c.req.param("chatSpaceId");
+  const db = c.env.DB;
+
+  const stats = await db.prepare(`
+    SELECT 
+      COUNT(*) as total,
+      SUM(CASE WHEN embedding IS NOT NULL THEN 1 ELSE 0 END) as vectorized,
+      SUM(CASE WHEN archived = 1 THEN 1 ELSE 0 END) as archived
+    FROM character_memories 
+    WHERE user_id = ? AND chat_space_id = ?
+  `).bind(userId, chatSpaceId).first();
+
+  return c.json({
+    total: stats.total || 0,
+    vectorized: stats.vectorized || 0,
+    archived: stats.archived || 0,
+    vectorizationProgress: stats.total ? (stats.vectorized / stats.total * 100).toFixed(1) : 0,
+  });
+});
+
+function rowToMemory(row) {
+  return {
+    id: row.id,
+    text: row.text,
+    type: row.semantic_type || "event",
+    importance: row.importance || 0.5,
+    hasEmbedding: !!row.embedding,
+    archived: !!row.archived,
+    lastAccessed: row.last_accessed,
+    createdAt: row.created_at,
+  };
+}
 
 // --- Messages ---
 
@@ -398,6 +510,83 @@ function rowToMessage(row) {
     meta: parseJSON(row.meta, {}),
     created_at: row.created_at,
   };
+}
+
+// --- 向量化辅助函数 ---
+
+async function generateEmbedding(text, env) {
+  try {
+    if (env.OPENAI_API_KEY) {
+      const response = await fetch("https://api.openai.com/v1/embeddings", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${env.OPENAI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          input: text.slice(0, 8191),
+          model: "text-embedding-3-small",
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`OpenAI API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.data?.[0]?.embedding || null;
+    }
+
+    if (env.AI) {
+      const response = await env.AI.run("@cf/baai/bge-small-en-v1.5", {
+        text: text.slice(0, 512),
+      });
+      return response?.result?.embeddings?.[0] || null;
+    }
+
+    return null;
+  } catch (err) {
+    console.error("向量化错误:", err);
+    return null;
+  }
+}
+
+function encodeEmbedding(vector) {
+  if (!Array.isArray(vector)) return null;
+  return JSON.stringify(vector);
+}
+
+function decodeEmbedding(blob) {
+  try {
+    if (typeof blob === "string") {
+      return JSON.parse(blob);
+    }
+    return blob;
+  } catch {
+    return [];
+  }
+}
+
+function cosineSimilarity(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) {
+    return 0;
+  }
+
+  let dotProduct = 0;
+  let normA = 0;
+  let normB = 0;
+
+  for (let i = 0; i < a.length; i++) {
+    dotProduct += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+
+  normA = Math.sqrt(normA);
+  normB = Math.sqrt(normB);
+
+  if (normA === 0 || normB === 0) return 0;
+  return dotProduct / (normA * normB);
 }
 
 // --- Health ---

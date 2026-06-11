@@ -21,6 +21,7 @@ import { getMemorySettings, getModelSettings, getPromptSettings, getSettings, ge
 import { addMemories, getRecentMemories } from "../store/characterMemory.js";
 import { toggleUserBlock, isUserBlocked } from "../store/characters.js";
 import { searchMemories } from "../systems/memorySearch.js";
+import { searchRelevantMemories, queueMemoryForSaving, ensureMemoriesSaved } from "../api/memoryService.js";
 import { saveContextSnapshot, updateContextSnapshot } from "../store/contextLogs.js";
 import { getSessionId } from "../store/session.js";
 import { buildContextPreview } from "../systems/context.js";
@@ -742,7 +743,11 @@ async function maybeExtractMemories(chatSpaceId, messages, modelSettings) {
     });
     if (result.ok && result.text) {
       const facts = result.text.split("\n").map(s => s.trim()).filter(Boolean);
-      if (facts.length) addMemories(chatSpaceId, facts);
+      if (facts.length) {
+        addMemories(chatSpaceId, facts);
+        // Also queue for cloud vector saving
+        for (const f of facts) queueMemoryForSaving(chatSpaceId, f, "event", 0.3);
+      }
     }
   } catch {
     // memory extraction is best-effort
@@ -1258,7 +1263,7 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
     const recentLimit = Number(memorySettings.recentMessageLimit || 20);
     const shouldUseLongTermMemory = chatSpaceId === "main" || chatSpaceId.startsWith("char_");
     const isCharSpace = chatSpaceId.startsWith("char_");
-    const [memories, emotion] = await Promise.all([
+    const [memories, emotion, vectorMemoryText] = await Promise.all([
       shouldUseLongTermMemory
         ? isCharSpace
           ? (() => {
@@ -1276,6 +1281,7 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
           : getInjectedMemories(memoryLimit, memorySettings)
         : [],
       getEmotionState(),
+      isCharSpace && isLoggedIn() ? searchRelevantMemories(chatSpaceId, userText, 5).catch(() => "") : Promise.resolve(""),
     ]);
     const recentMessages = getModelContextMessages(sourceMessages)
       .slice(-recentLimit)
@@ -1299,6 +1305,10 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
         voiceMode: characterVoiceMode,
       } : null,
     });
+    // Inject cloud vector memory into system prompt
+    if (vectorMemoryText) {
+      contextPreview.systemPrompt += `\n\n【云端相关记忆】\n${vectorMemoryText}\n\n请自然融入对话，不要复述原始记忆。`;
+    }
     const timeContext = { role: "user", content: contextPreview.timeContext };
     const uiAwarenessContext = buildUiAwarenessContext({
       affordanceState: readChatAffordanceState(),
@@ -1696,6 +1706,7 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
 
     return () => {
       cancelled = true;
+      if (characterId) ensureMemoriesSaved(characterId);
     };
   }, [activeChatSpaceId]);
 
