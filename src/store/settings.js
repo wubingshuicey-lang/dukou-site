@@ -78,7 +78,7 @@ export const DEFAULT_MODEL_SETTINGS = {
   model: "deepseek-chat",
   // Per-capability model overrides: if empty, falls back to `model`
   chatModel: "",
-  imageModel: "gptimage1.5",
+  imageModel: "google/gemini-2.5-flash-image",
   imageProvider: "",
   imageApiKey: "",
   imageBaseUrl: "",

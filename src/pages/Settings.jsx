@@ -985,6 +985,8 @@ function ModelSettingsPage({ settings, modelStatus, onBack, onRequestLeave, onSa
                   onChange={(e) => updateDraft({ imageModel: e.target.value })}
                 >
                   <option value="">-- 跟随聊天模型 --</option>
+                  <option value="google/gemini-2.5-flash-image">gemini-2.5-flash-image</option>
+                  <option value="google/gemini-3-pro-image-preview">gemini-3-pro-image</option>
                   <option value="gptimage1.5">gptimage1.5</option>
                   <option value="openai/gpt-image-2">openai/gpt-image-2</option>
                   <option value="openai/gpt-image-1.5">openai/gpt-image-1.5</option>
