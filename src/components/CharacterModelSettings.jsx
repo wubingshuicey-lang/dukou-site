@@ -234,13 +234,24 @@ export default function CharacterModelSettings({ characterId, onSaved, onClose }
                   <label className="charm-label">生图模型</label>
                   <select className="charm-input" value={imageModel} onChange={(e) => setImageModel(e.target.value)}>
                     <option value="">-- 留空不启用 --</option>
+                    <option value="openai/gpt-image-2">GPT Image 2</option>
+                    <option value="openai/gpt-image-1.5">GPT Image 1.5</option>
                     <option value="gptimage1.5">gptimage1.5</option>
-                    <option value="openai/gpt-image-2">openai/gpt-image-2</option>
-                    <option value="openai/gpt-image-1.5">openai/gpt-image-1.5</option>
-                    <option value="google/gemini-2.5-flash-image">gemini-2.5-flash-image</option>
-                    <option value="google/gemini-3-pro-image-preview">gemini-3-pro-image</option>
+                    <option value="dall-e-3">DALL·E 3</option>
+                    <option value="google/gemini-2.5-flash-image">Gemini 2.5 Flash Image</option>
+                    <option value="google/gemini-3-pro-image-preview">Gemini 3 Pro Image</option>
+                    <option value="google/imagen-4.0-generate-001">Imagen 4.0</option>
+                    <option value="google/imagen-3.0-generate-001">Imagen 3.0</option>
+                    <option value="stability/sd3.5-large">SD 3.5 Large</option>
+                    <option value="stability/sd3-medium">SD3 Medium</option>
+                    <option value="black-forest-labs/flux-schnell">Flux Schnell</option>
+                    <option value="black-forest-labs/flux-dev">Flux Dev</option>
+                    <option value="black-forest-labs/flux-pro">Flux Pro</option>
+                    <option value="ideogram-ai/ideogram-v2">Ideogram V2</option>
+                    <option value="recraft-v3">Recraft V3</option>
+                    <option value="volcengine/doubao-seedream-4.5">Doubao Seedream 4.5</option>
                   </select>
-                  {imageModel && !["gptimage1.5","openai/gpt-image-2","openai/gpt-image-1.5","google/gemini-2.5-flash-image","google/gemini-3-pro-image-preview"].includes(imageModel) && (
+                  {imageModel && !["openai/gpt-image-2","openai/gpt-image-1.5","gptimage1.5","dall-e-3","google/gemini-2.5-flash-image","google/gemini-3-pro-image-preview","google/imagen-4.0-generate-001","google/imagen-3.0-generate-001","stability/sd3.5-large","stability/sd3-medium","black-forest-labs/flux-schnell","black-forest-labs/flux-dev","black-forest-labs/flux-pro","ideogram-ai/ideogram-v2","recraft-v3","volcengine/doubao-seedream-4.5"].includes(imageModel) && (
                     <input className="charm-input" style={{marginTop:4}} value={imageModel} onChange={(e) => setImageModel(e.target.value)} placeholder="自定义模型 ID" />
                   )}
                 </div>
@@ -340,23 +351,24 @@ export default function CharacterModelSettings({ characterId, onSaved, onClose }
             </div>
 
             <div className="charm-field">
-              <button
-                className="charm-test-btn"
-                type="button"
-                onClick={fetchVoices}
-                disabled={fetchingVoices}
-              >
-                {fetchingVoices ? "获取中..." : "获取可用声音列表"}
-              </button>
-              <button
-                className="charm-test-btn"
-                type="button"
-                onClick={testTts}
-                disabled={testingTts}
-                style={{ marginLeft: 8 }}
-              >
-                {testingTts ? "测试中..." : "测试 TTS"}
-              </button>
+              <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                <button
+                  className="charm-test-btn"
+                  type="button"
+                  onClick={fetchVoices}
+                  disabled={fetchingVoices}
+                >
+                  {fetchingVoices ? "获取中..." : "获取可用声音列表"}
+                </button>
+                <button
+                  className="charm-test-btn"
+                  type="button"
+                  onClick={testTts}
+                  disabled={testingTts}
+                >
+                  {testingTts ? "测试中..." : "测试 TTS"}
+                </button>
+              </div>
               {voiceError && (
                 <div className="charm-test-result fail" style={{ marginTop: 6 }}>✗ {voiceError}</div>
               )}

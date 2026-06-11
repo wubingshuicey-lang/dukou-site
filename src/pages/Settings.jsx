@@ -985,17 +985,28 @@ function ModelSettingsPage({ settings, modelStatus, onBack, onRequestLeave, onSa
                   onChange={(e) => updateDraft({ imageModel: e.target.value })}
                 >
                   <option value="">-- 跟随聊天模型 --</option>
-                  <option value="google/gemini-2.5-flash-image">gemini-2.5-flash-image</option>
-                  <option value="google/gemini-3-pro-image-preview">gemini-3-pro-image</option>
+                  <option value="openai/gpt-image-2">GPT Image 2</option>
+                  <option value="openai/gpt-image-1.5">GPT Image 1.5</option>
                   <option value="gptimage1.5">gptimage1.5</option>
-                  <option value="openai/gpt-image-2">openai/gpt-image-2</option>
-                  <option value="openai/gpt-image-1.5">openai/gpt-image-1.5</option>
+                  <option value="dall-e-3">DALL·E 3</option>
+                  <option value="google/gemini-2.5-flash-image">Gemini 2.5 Flash Image</option>
+                  <option value="google/gemini-3-pro-image-preview">Gemini 3 Pro Image</option>
+                  <option value="google/imagen-4.0-generate-001">Imagen 4.0</option>
+                  <option value="google/imagen-3.0-generate-001">Imagen 3.0</option>
+                  <option value="stability/sd3.5-large">SD 3.5 Large</option>
+                  <option value="stability/sd3-medium">SD3 Medium</option>
+                  <option value="black-forest-labs/flux-schnell">Flux Schnell</option>
+                  <option value="black-forest-labs/flux-dev">Flux Dev</option>
+                  <option value="black-forest-labs/flux-pro">Flux Pro</option>
+                  <option value="ideogram-ai/ideogram-v2">Ideogram V2</option>
+                  <option value="recraft-v3">Recraft V3</option>
+                  <option value="volcengine/doubao-seedream-4.5">Doubao Seedream 4.5</option>
                   {COMMON_MODELS.filter(m => m.includes("image") || m.includes("dall-e")).map(m => (
                     <option key={m} value={m}>{m}</option>
                   ))}
                   <option value="__custom__">其他（下方输入）</option>
                 </select>
-                {draft.imageModel && !["openai/gpt-image-2", "openai/gpt-image-1.5"].includes(draft.imageModel) && !COMMON_MODELS.includes(draft.imageModel) && (
+                {draft.imageModel && !["openai/gpt-image-2","openai/gpt-image-1.5","gptimage1.5","dall-e-3","google/gemini-2.5-flash-image","google/gemini-3-pro-image-preview","google/imagen-4.0-generate-001","google/imagen-3.0-generate-001","stability/sd3.5-large","stability/sd3-medium","black-forest-labs/flux-schnell","black-forest-labs/flux-dev","black-forest-labs/flux-pro","ideogram-ai/ideogram-v2","recraft-v3","volcengine/doubao-seedream-4.5"].includes(draft.imageModel) && !COMMON_MODELS.includes(draft.imageModel) && (
                   <input
                     className="settings-control"
                     style={{ marginTop: 4 }}
