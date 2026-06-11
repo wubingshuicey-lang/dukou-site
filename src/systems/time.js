@@ -21,17 +21,33 @@ export function formatDuration(ms) {
   return `${Math.round(hours / 24)} 天`;
 }
 
+export function getDeviceContext() {
+  const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
+  const isMobile = /Mobi|Android|iPhone|iPad/i.test(ua);
+  const weekdays = ["周日","周一","周二","周三","周四","周五","周六"];
+  const now = new Date();
+  const month = now.getMonth() + 1;
+  const season = month >= 3 && month <= 5 ? "春天" : month >= 6 && month <= 8 ? "夏天" : month >= 9 && month <= 11 ? "秋天" : "冬天";
+  return {
+    device: isMobile ? "手机" : "电脑",
+    weekday: weekdays[now.getDay()],
+    season,
+    hour: now.getHours(),
+  };
+}
+
 export function buildTimeContext(prevMsgTime, lastSessionTime) {
   const now = new Date();
+  const ctx = getDeviceContext();
+  const parts = [
+    `[当前时间] ${now.toLocaleString("zh-CN")} ${ctx.weekday}，${ctx.season}`,
+    `[设备] 用户在用${ctx.device}`,
+    lastSessionTime ? `[距上次对话 ${formatDuration(now - new Date(lastSessionTime))}]` : "",
+    prevMsgTime ? `[我上条消息发于 ${formatDuration(now - new Date(prevMsgTime))} 前]` : "",
+  ];
   return {
     role: "user",
-    content: [
-      `[当前时间] ${now.toLocaleString("zh-CN")}`,
-      lastSessionTime ? `[距上次对话 ${formatDuration(now - new Date(lastSessionTime))}]` : "",
-      prevMsgTime ? `[我上条消息发于 ${formatDuration(now - new Date(prevMsgTime))} 前]` : "",
-    ]
-      .filter(Boolean)
-      .join(" | "),
+    content: parts.filter(Boolean).join(" | "),
   };
 }
 
