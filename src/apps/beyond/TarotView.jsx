@@ -684,9 +684,9 @@ ${isBig ? "请逐一解读五张牌的位置含义，最后给出整体启示。
     return (
       <div style={{ padding: "24px 16px", minHeight: "100%" }}>
         <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 13, color: "rgba(184,149,106,0.7)", marginBottom: 4, fontFamily: "serif", letterSpacing: 2 }}>BIRTH SIGN</div>
-          <div style={{ fontSize: 20, color: "#e8ddd0", fontWeight: 400, marginBottom: 2 }}>你的星座是？</div>
-          <div style={{ fontSize: 12, color: "rgba(232,221,208,0.4)", marginTop: 4 }}>占卜师需要知道你的星象，以给出更准确的解读</div>
+          <div style={{ fontSize: 13, color: "color-mix(in srgb, var(--text-main) 60%, transparent)", marginBottom: 4, fontFamily: "serif", letterSpacing: 2 }}>BIRTH SIGN</div>
+          <div style={{ fontSize: 20, color: "var(--text-main)", fontWeight: 400, marginBottom: 2 }}>你的星座是？</div>
+          <div style={{ fontSize: 12, color: "color-mix(in srgb, var(--text-main) 40%, transparent)", marginTop: 4 }}>占卜师需要知道你的星象，以给出更准确的解读</div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
           {ZODIAC_LIST.map(z => (
@@ -719,13 +719,13 @@ ${isBig ? "请逐一解读五张牌的位置含义，最后给出整体启示。
   }
 
   return (
-    <div style={{ padding: "16px 14px", minHeight: "100%", background: "var(--shell-bg, #0e0c1b)" }}>
+    <div style={{ padding: "16px 14px", minHeight: "100%", background: "var(--shell-bg)" }}>
 
       {/* 顶部星座 */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
         <div style={{ fontSize: 11, color: "rgba(184,149,106,0.5)", fontFamily: "serif", letterSpacing: 3 }}>TAROT · ARCANA</div>
         <button onClick={() => setEditingZodiac(true)}
-          style={{ border: "1px solid rgba(184,149,106,0.25)", borderRadius: 6, background: "rgba(184,149,106,0.06)", padding: "3px 10px", fontSize: 11, color: "rgba(184,149,106,0.7)", cursor: "pointer", fontFamily: "serif", letterSpacing: 1 }}>
+          style={{ border: "1px solid rgba(184,149,106,0.25)", borderRadius: 6, background: "rgba(184,149,106,0.06)", padding: "3px 10px", fontSize: 11, color: "color-mix(in srgb, var(--text-main) 60%, transparent)", cursor: "pointer", fontFamily: "serif", letterSpacing: 1 }}>
           {zodiac || "设定星座"} {zodiac ? "↻" : ""}
         </button>
       </div>
@@ -733,7 +733,7 @@ ${isBig ? "请逐一解读五张牌的位置含义，最后给出整体启示。
       {/* 问题类型选择 */}
       {phase === "idle" && !questionType && (
         <div className="tv2-fadein" style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 12, color: "rgba(232,221,208,0.4)", marginBottom: 10, textAlign: "center", letterSpacing: 1 }}>选择你的问题规模</div>
+          <div style={{ fontSize: 12, color: "color-mix(in srgb, var(--text-main) 40%, transparent)", marginBottom: 10, textAlign: "center", letterSpacing: 1 }}>选择你的问题规模</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
             {[
               { type: "small", title: "小问题", sub: "抽一张牌 · 单刀直入", icon: "✦" },
@@ -753,8 +753,8 @@ ${isBig ? "请逐一解读五张牌的位置含义，最后给出整体启示。
                 onMouseEnter={e => { e.currentTarget.style.background="rgba(184,149,106,0.1)"; e.currentTarget.style.borderColor="rgba(184,149,106,0.55)"; }}
                 onMouseLeave={e => { e.currentTarget.style.background="rgba(184,149,106,0.04)"; e.currentTarget.style.borderColor="rgba(184,149,106,0.3)"; }}>
                 <div style={{ fontSize: 20, color: gold, opacity: 0.7, marginBottom: 6 }}>{opt.icon}</div>
-                <div style={{ fontSize: 14, color: "#e8ddd0", fontWeight: 500, marginBottom: 4 }}>{opt.title}</div>
-                <div style={{ fontSize: 10, color: "rgba(232,221,208,0.4)", lineHeight: 1.5 }}>{opt.sub}</div>
+                <div style={{ fontSize: 14, color: "var(--text-main)", fontWeight: 500, marginBottom: 4 }}>{opt.title}</div>
+                <div style={{ fontSize: 10, color: "color-mix(in srgb, var(--text-main) 40%, transparent)", lineHeight: 1.5 }}>{opt.sub}</div>
               </button>
             ))}
           </div>
@@ -776,7 +776,7 @@ ${isBig ? "请逐一解读五张牌的位置含义，最后给出整体启示。
           <textarea value={question} onChange={e => setQuestion(e.target.value)}
             placeholder={questionType === "big" ? "这个问题关乎人生走向，或关系的深层……" : "比如：我和 TA 的关系会如何发展？"}
             rows={2}
-            style={{ width: "100%", resize: "vertical", border: "1px solid rgba(184,149,106,0.25)", borderRadius: 8, outline: "none", background: "rgba(184,149,106,0.04)", color: "#e8ddd0", fontSize: 13, lineHeight: 1.7, padding: "10px 12px", fontFamily: "inherit", boxSizing: "border-box" }}/>
+            style={{ width: "100%", resize: "vertical", border: "1px solid rgba(184,149,106,0.25)", borderRadius: 8, outline: "none", background: "rgba(184,149,106,0.04)", color: "var(--text-main)", fontSize: 13, lineHeight: 1.7, padding: "10px 12px", fontFamily: "inherit", boxSizing: "border-box" }}/>
           <button onClick={handleDraw} disabled={!question.trim()}
             style={{ marginTop: 10, width: "100%", padding: "11px 0", border: "1px solid rgba(184,149,106,0.35)", borderRadius: 10, background: question.trim() ? "rgba(184,149,106,0.12)" : "transparent", color: question.trim() ? gold : "rgba(184,149,106,0.3)", fontSize: 14, fontWeight: 400, cursor: question.trim() ? "pointer" : "default", fontFamily: "serif", letterSpacing: 2, transition: "all .2s" }}>
             {questionType === "small" ? "命运，揭示" : "星阵，展开"}
@@ -808,11 +808,11 @@ ${isBig ? "请逐一解读五张牌的位置含义，最后给出整体启示。
                 <CardFace cardId={drawn.card.id} reversed={drawn.reversed} size={80}/>
               </div>
               <div>
-                <div style={{ fontSize: 18, color: "#e8ddd0", fontWeight: 400, fontFamily: "serif", marginBottom: 2 }}>
+                <div style={{ fontSize: 18, color: "var(--text-main)", fontWeight: 400, fontFamily: "serif", marginBottom: 2 }}>
                   {drawn.card.name}
                 </div>
                 {drawn.reversed && <div style={{ fontSize: 11, color: "#c87070", marginBottom: 4, letterSpacing: 1 }}>逆 位</div>}
-                <div style={{ fontSize: 10, color: "rgba(232,221,208,0.35)", fontFamily: "serif", letterSpacing: 2, marginBottom: 6 }}>{drawn.card.en.toUpperCase()}</div>
+                <div style={{ fontSize: 10, color: "color-mix(in srgb, var(--text-main) 35%, transparent)", fontFamily: "serif", letterSpacing: 2, marginBottom: 6 }}>{drawn.card.en.toUpperCase()}</div>
                 <div style={{ fontSize: 11, color: "rgba(184,149,106,0.6)", lineHeight: 1.6 }}>{drawn.card.meaning}</div>
               </div>
             </div>
@@ -834,7 +834,7 @@ ${isBig ? "请逐一解读五张牌的位置含义，最后给出整体启示。
 
           {/* 解读文字 */}
           {(revealText || error) && (
-            <div style={{ padding: "14px", border: "1px solid rgba(184,149,106,0.2)", borderRadius: 10, background: "rgba(184,149,106,0.04)", fontSize: 13, lineHeight: 1.9, color: "#e8ddd0", whiteSpace: "pre-wrap" }}>
+            <div style={{ padding: "14px", border: "1px solid rgba(184,149,106,0.2)", borderRadius: 10, background: "rgba(184,149,106,0.04)", fontSize: 13, lineHeight: 1.9, color: "var(--text-main)", whiteSpace: "pre-wrap" }}>
               {error || revealText}
               {revealText && revealText.length < interpretation.length && (
                 <span style={{ display: "inline-block", width: 1, height: 15, background: gold, opacity: 0.5, marginLeft: 2, verticalAlign: "text-bottom" }}/>
@@ -861,7 +861,7 @@ ${isBig ? "请逐一解读五张牌的位置含义，最后给出整体启示。
             <polygon points="24,4 28,20 44,24 28,28 24,44 20,28 4,24 20,20" fill="none" stroke={gold} strokeWidth={1}/>
             <circle cx={24} cy={24} r={4} fill={gold} fillOpacity={0.5}/>
           </svg>
-          <div style={{ fontSize: 13, color: "#e8ddd0" }}>选择问题规模，开始占卜</div>
+          <div style={{ fontSize: 13, color: "var(--text-main)" }}>选择问题规模，开始占卜</div>
           {zodiac && <div style={{ fontSize: 11, color: "rgba(184,149,106,0.5)", marginTop: 4, fontFamily: "serif" }}>{zodiac}</div>}
         </div>
       )}
