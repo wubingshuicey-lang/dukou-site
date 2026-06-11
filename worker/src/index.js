@@ -517,7 +517,8 @@ function rowToMessage(row) {
 async function generateEmbedding(text, env) {
   try {
     if (env.OPENAI_API_KEY) {
-      const response = await fetch("https://api.openai.com/v1/embeddings", {
+      const baseUrl = (env.EMBEDDING_BASE_URL || "https://api.openai.com/v1").replace(/\/+$/, "");
+      const response = await fetch(`${baseUrl}/embeddings`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${env.OPENAI_API_KEY}`,

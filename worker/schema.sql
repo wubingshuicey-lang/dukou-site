@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS character_memories (
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- Migration: add new columns to existing table (safe to run repeatedly)
+-- Migration: add new columns to existing table (D1 compatible, no non-constant defaults)
 ALTER TABLE character_memories ADD COLUMN embedding TEXT;
 ALTER TABLE character_memories ADD COLUMN embedding_model TEXT;
 ALTER TABLE character_memories ADD COLUMN semantic_type TEXT DEFAULT 'event';
@@ -65,7 +65,7 @@ ALTER TABLE character_memories ADD COLUMN importance REAL DEFAULT 0.5;
 ALTER TABLE character_memories ADD COLUMN reference_message_id TEXT;
 ALTER TABLE character_memories ADD COLUMN archived INTEGER DEFAULT 0;
 ALTER TABLE character_memories ADD COLUMN last_accessed DATETIME;
-ALTER TABLE character_memories ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE character_memories ADD COLUMN updated_at DATETIME;
 
 CREATE TABLE IF NOT EXISTS messages (
   id TEXT PRIMARY KEY,

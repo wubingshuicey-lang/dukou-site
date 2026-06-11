@@ -14,6 +14,7 @@ import emotionSadSrc from "../assets/emotion-sad.svg";
 import { getEmotionState, getInjectedMemories } from "../api/memory.js";
 import { getRecentMessages, insertMessage, markDuMessagesRead, markUserMessagesRead, updateMessageRecord } from "../api/messages.js";
 import { loadCloudMessages } from "../api/messageArchive.js";
+import { isLoggedIn } from "../api/apiClient.js";
 import { sendChatRequest } from "../api/chatTransport.js";
 import { callModel, normalizeModelError } from "../api/modelClient.js";
 import { generateImage } from "../api/providers/imageGeneration.js";
