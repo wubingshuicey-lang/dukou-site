@@ -395,7 +395,10 @@ export function getCharacterModelSettings(charId) {
     apiKey: char.modelApiKey || "",
     baseUrl: char.modelBaseUrl || provider.baseUrl,
     model: char.modelName || provider.defaultModel,
+    // Independent image generation settings
     imageModel: char.imageModel || "",
+    imageApiKey: char.imageApiKey || "",
+    imageBaseUrl: char.imageBaseUrl || "",
     ttsModel: char.ttsModel || "",
   };
 }

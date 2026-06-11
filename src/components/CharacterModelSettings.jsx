@@ -32,6 +32,8 @@ export default function CharacterModelSettings({ characterId, onSaved, onClose }
   const [modelName, setModelName] = useState(char?.modelName || "");
   const [baseUrl, setBaseUrl] = useState(char?.modelBaseUrl || "");
   const [imageModel, setImageModel] = useState(char?.imageModel || "");
+  const [imageApiKey, setImageApiKey] = useState(char?.imageApiKey || "");
+  const [imageBaseUrl, setImageBaseUrl] = useState(char?.imageBaseUrl || "");
   const [ttsModel, setTtsModel] = useState(char?.ttsModel || "");
   const [elevenlabsApiKey, setElevenlabsApiKey] = useState(char?.elevenlabsApiKey || "");
   const [voiceId, setVoiceId] = useState(char?.voiceId || "");
@@ -142,6 +144,8 @@ export default function CharacterModelSettings({ characterId, onSaved, onClose }
       modelName: modelName,
       modelBaseUrl: baseUrl,
       imageModel,
+      imageApiKey,
+      imageBaseUrl,
       ttsModel,
       elevenlabsApiKey,
       voiceId,
@@ -230,9 +234,28 @@ export default function CharacterModelSettings({ characterId, onSaved, onClose }
                   <label className="charm-label">生图模型</label>
                   <input
                     className="charm-input"
-                    placeholder="如 openai/gpt-image-2，留空不启用"
+                    placeholder="如 google/gemini-2.5-flash-image，留空不启用"
                     value={imageModel}
                     onChange={(e) => setImageModel(e.target.value)}
+                  />
+                </div>
+                <div className="charm-field">
+                  <label className="charm-label">生图 Base URL（独立，留空跟随聊天）</label>
+                  <input
+                    className="charm-input"
+                    placeholder="生图接口地址，留空则跟随聊天 Base URL"
+                    value={imageBaseUrl}
+                    onChange={(e) => setImageBaseUrl(e.target.value)}
+                  />
+                </div>
+                <div className="charm-field">
+                  <label className="charm-label">生图 API Key（独立，留空跟随聊天）</label>
+                  <input
+                    className="charm-input"
+                    type="password"
+                    placeholder="生图专用 Key，留空则跟随聊天 Key"
+                    value={imageApiKey}
+                    onChange={(e) => setImageApiKey(e.target.value)}
                   />
                 </div>
                 <div className="charm-field">
