@@ -82,6 +82,8 @@ export const DEFAULT_MODEL_SETTINGS = {
   imageProvider: "",
   imageApiKey: "",
   imageBaseUrl: "",
+  supabaseUrl: "",
+  supabaseAnonKey: "",
   sttModel: "whisper-1",
   ttsModel: "tts-1",
   temperature: 0.8,

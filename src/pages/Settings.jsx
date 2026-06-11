@@ -1023,6 +1023,44 @@ function ModelSettingsPage({ settings, modelStatus, onBack, onRequestLeave, onSa
               </Row>
             </Section>
           )}
+          {draft.provider && draft.provider !== "kiwi_local" && (
+            <Section title="Supabase 跨设备同步（可选）">
+              <InlineNotice>配置 Supabase pgvector 后，记忆可跨设备实时同步。留空则仅本地 + Worker 存储。</InlineNotice>
+              <Row label="Supabase URL">
+                <input
+                  className="settings-control"
+                  value={draft.supabaseUrl || ""}
+                  onChange={(e) => updateDraft({ supabaseUrl: e.target.value })}
+                  placeholder="https://xxx.supabase.co"
+                />
+              </Row>
+              <Row label="Supabase Anon Key">
+                <input
+                  className="settings-control"
+                  type="password"
+                  value={draft.supabaseAnonKey || ""}
+                  onChange={(e) => updateDraft({ supabaseAnonKey: e.target.value })}
+                  placeholder="eyJ..."
+                />
+              </Row>
+              <Row label="数据库设置">
+                <small style={{ color: "var(--text-sub)", fontSize: 11, lineHeight: 1.6 }}>
+                  在 Supabase SQL Editor 中执行：<br />
+                  <code>CREATE EXTENSION IF NOT EXISTS vector;</code><br />
+                  <code style={{ display: "block", marginTop: 4, whiteSpace: "pre-wrap" }}>{`CREATE TABLE character_memories (
+  id BIGSERIAL PRIMARY KEY,
+  chat_space_id TEXT NOT NULL,
+  text TEXT NOT NULL,
+  embedding VECTOR(1536),
+  semantic_type TEXT DEFAULT 'event',
+  importance REAL DEFAULT 0.5,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX idx_mem_chat ON character_memories(chat_space_id);`}</code>
+                </small>
+              </Row>
+            </Section>
+          )}
           <Row label="API Key" sub={apiKeyDisabled ? "Kiwi Local 不在前端保存真实模型 key" : ""}>
             <input
               className="settings-control"

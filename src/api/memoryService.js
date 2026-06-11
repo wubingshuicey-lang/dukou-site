@@ -8,6 +8,7 @@
  */
 
 import { searchMemories, pushMemories, fetchMemoryStats } from "./apiClient.js";
+import { searchSupabaseMemories, saveSupabaseMemory, isSupabaseReady } from "./supabaseClient.js";
 
 const PENDING_KEY_PREFIX = "dukou:pendingMemories";
 
@@ -16,6 +17,14 @@ const PENDING_KEY_PREFIX = "dukou:pendingMemories";
 export async function searchRelevantMemories(chatSpaceId, query, limit = 5) {
   if (!chatSpaceId || !query) return "";
   try {
+    // Try Supabase first (cross-platform sync)
+    const supabaseResults = await searchSupabaseMemories(chatSpaceId, query, limit);
+    if (supabaseResults.length > 0) {
+      return supabaseResults
+        .map((m, i) => `${i + 1}. ${m.text}${m.importance ? ` (重要度: ${Math.round(m.importance * 100)}%)` : ""}`)
+        .join("\n");
+    }
+    // Fall back to Worker/D1
     const result = await searchMemories(chatSpaceId, query, limit);
     const list = result?.results || result || [];
     if (!Array.isArray(list) || list.length === 0) return "";
@@ -30,6 +39,9 @@ export async function searchRelevantMemories(chatSpaceId, query, limit = 5) {
 // --- 累积 + 批量上传 ---
 
 export function queueMemoryForSaving(chatSpaceId, text, type = "event", importance = 0.3) {
+  // Also save to Supabase directly for cross-platform sync
+  saveSupabaseMemory({ chatSpaceId, text, type, importance }).catch(() => {});
+  // Keep existing queue + Worker path
   const key = `${PENDING_KEY_PREFIX}:${chatSpaceId}`;
   try {
     const pending = JSON.parse(localStorage.getItem(key) || "[]");
