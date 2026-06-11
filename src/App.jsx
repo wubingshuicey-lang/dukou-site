@@ -7,6 +7,7 @@ import Settings from "./pages/Settings.jsx";
 import CharacterCreatePage from "./pages/CharacterCreatePage.jsx";
 import BeyondApp from "./apps/BeyondApp.jsx";
 import GalleryApp from "./apps/GalleryApp.jsx";
+import MailApp from "./apps/MailApp.jsx";
 import { loadCloudSettings } from "./store/settings.js";
 import { loadCloudCharacters } from "./store/characters.js";
 
@@ -79,6 +80,8 @@ export default function App() {
         );
       case "gallery":
         return <GalleryApp onBack={handleCloseApp} />;
+      case "mail":
+        return <MailApp onBack={handleCloseApp} />;
       case "beyond":
         return <BeyondApp onBack={handleCloseApp} />;
       case "settings":
