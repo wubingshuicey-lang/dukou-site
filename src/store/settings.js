@@ -78,7 +78,7 @@ export const DEFAULT_MODEL_SETTINGS = {
   model: "deepseek-chat",
   // Per-capability model overrides: if empty, falls back to `model`
   chatModel: "",
-  imageModel: "openai/gpt-image-2",
+  imageModel: "gptimage1.5",
   imageProvider: "",
   imageApiKey: "",
   imageBaseUrl: "",
