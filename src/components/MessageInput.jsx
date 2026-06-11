@@ -51,6 +51,15 @@ function ImageIcon() {
   );
 }
 
+function CameraIcon() {
+  return (
+    <svg viewBox="0 0 18 18" aria-hidden="true">
+      <path d="M6 4.5L7.5 3h3l1.5 1.5H15v10H3v-10h3z" />
+      <circle cx="9" cy="9.5" r="2.5" />
+    </svg>
+  );
+}
+
 function VoiceIcon() {
   return (
     <svg viewBox="0 0 18 18" aria-hidden="true">
@@ -106,10 +115,12 @@ export default function MessageInput({
 }) {
   const [toolsOpen, setToolsOpen] = useState(false);
   const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
   const hasTextContent = Boolean(value.trim());
   const hasPendingContent = hasTextContent || Boolean(pendingImage);
   const toolItems = [
     { id: 'image', label: '图片', icon: <ImageIcon /> },
+    { id: 'camera', label: '拍照', icon: <CameraIcon /> },
     { id: 'file', label: '上传文件', icon: <FileIcon /> },
     { id: 'call', label: '电话', icon: <CallIcon /> },
   ];
@@ -117,6 +128,8 @@ export default function MessageInput({
   const selectTool = (id) => {
     if (id === "image") {
       fileInputRef.current?.click();
+    } else if (id === "camera") {
+      cameraInputRef.current?.click();
     } else {
       onToolAction?.(id);
     }
@@ -147,6 +160,15 @@ export default function MessageInput({
         ref={fileInputRef}
         type="file"
         accept="image/*"
+        style={{ display: "none" }}
+        onChange={handleFileChange}
+      />
+      {/* Camera input — mobile direct capture */}
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
         style={{ display: "none" }}
         onChange={handleFileChange}
       />
