@@ -1,8 +1,8 @@
-function normalizeBaseUrl(baseUrl) {
+export function normalizeBaseUrl(baseUrl) {
   return baseUrl.replace(/\/+$/, "");
 }
 
-function extractImage(data) {
+export function extractImage(data) {
   if (data?.data?.[0]?.url) return { type: "url", value: data.data[0].url };
   if (data?.data?.[0]?.b64_json) return { type: "b64", value: data.data[0].b64_json };
   if (data?.generated_images?.[0]?.image) return { type: "b64", value: data.generated_images[0].image };

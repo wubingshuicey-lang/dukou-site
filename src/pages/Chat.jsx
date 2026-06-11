@@ -19,7 +19,7 @@ import { sendChatRequest } from "../api/chatTransport.js";
 import { callModel, normalizeModelError } from "../api/modelClient.js";
 import { generateImage } from "../api/providers/imageGeneration.js";
 import { getMemorySettings, getModelSettings, getPromptSettings, getSettings, getTransportSettings } from "../store/settings.js";
-import { addMemories, getRecentMemories } from "../store/characterMemory.js";
+import { addMemories, getRecentMemories, getLongTermMemory } from "../store/characterMemory.js";
 import { toggleUserBlock, isUserBlocked } from "../store/characters.js";
 import { searchMemories } from "../systems/memorySearch.js";
 import { searchRelevantMemories, queueMemoryForSaving, ensureMemoriesSaved } from "../api/memoryService.js";
@@ -746,9 +746,30 @@ async function maybeExtractMemories(chatSpaceId, messages, modelSettings) {
       const facts = result.text.split("\n").map(s => s.trim()).filter(Boolean);
       if (facts.length) {
         addMemories(chatSpaceId, facts);
-        // Also queue for cloud vector saving
         for (const f of facts) queueMemoryForSaving(chatSpaceId, f, "event", 0.3);
       }
+    }
+
+    // Long-term memory: when local memories exceed threshold, compress into summary
+    const { getMemoryCount, getLongTermMemory, setLongTermMemory } = await import("../store/characterMemory.js");
+    const totalMemories = getMemoryCount(chatSpaceId);
+    if (totalMemories >= 15 && totalMemories % 5 === 0) {
+      try {
+        const existingLTM = getLongTermMemory(chatSpaceId);
+        const recent = getRecentMemories(chatSpaceId, 20);
+        const memoryList = recent.map(m => m.text).join("\n");
+        const ltmPrompt = existingLTM
+          ? `你已有的长期记忆摘要：\n${existingLTM}\n\n新增记忆：\n${memoryList}\n\n请把新旧记忆融合成一段 200 字以内的综合摘要。保留最重要的信息，去掉重复和矛盾的内容。`
+          : `以下是关于这位用户的记忆片段：\n${memoryList}\n\n请提取核心信息，生成一段 150 字以内的用户画像摘要。`;
+        const ltmResult = await callModel({
+          messages: [{ role: "user", content: ltmPrompt }],
+          systemPrompt: "你是记忆压缩助手。输出简洁的综合摘要，不要编号。",
+          settings,
+        });
+        if (ltmResult.ok && ltmResult.text) {
+          setLongTermMemory(chatSpaceId, ltmResult.text.trim());
+        }
+      } catch { /* best-effort */ }
     }
   } catch {
     // memory extraction is best-effort
@@ -1264,7 +1285,7 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
     const recentLimit = Number(memorySettings.recentMessageLimit || 20);
     const shouldUseLongTermMemory = chatSpaceId === "main" || chatSpaceId.startsWith("char_");
     const isCharSpace = chatSpaceId.startsWith("char_");
-    const [memories, emotion, vectorMemoryText] = await Promise.all([
+    const [memories, emotion, vectorMemoryText, longTermMemory] = await Promise.all([
       shouldUseLongTermMemory
         ? isCharSpace
           ? (() => {
@@ -1283,6 +1304,7 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
         : [],
       getEmotionState(),
       isCharSpace && isLoggedIn() ? searchRelevantMemories(chatSpaceId, userText, 5).catch(() => "") : Promise.resolve(""),
+      isCharSpace ? Promise.resolve(getLongTermMemory(chatSpaceId) || "") : Promise.resolve(""),
     ]);
     const recentMessages = getModelContextMessages(sourceMessages)
       .slice(-recentLimit)
@@ -1308,7 +1330,11 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
     });
     // Inject cloud vector memory into system prompt
     if (vectorMemoryText) {
-      contextPreview.systemPrompt += `\n\n【云端相关记忆】\n${vectorMemoryText}\n\n请自然融入对话，不要复述原始记忆。`;
+      contextPreview.systemPrompt += `\n\n【近期相关记忆】\n${vectorMemoryText}\n\n请自然融入对话，不要复述原始记忆。`;
+    }
+    // Inject long-term memory summary
+    if (longTermMemory) {
+      contextPreview.systemPrompt += `\n\n【长期记忆】${longTermMemory}`;
     }
     const timeContext = { role: "user", content: contextPreview.timeContext };
     const uiAwarenessContext = buildUiAwarenessContext({

@@ -64,4 +64,19 @@ export function getMemoryCount(chatSpaceId) {
 /** Clear all memories for a character. */
 export function clearMemories(chatSpaceId) {
   localStorage.removeItem(STORE_PREFIX + chatSpaceId);
+  localStorage.removeItem(STORE_PREFIX + chatSpaceId + ":ltm");
+}
+
+// ── Long-term memory (summarized, persisted) ──
+
+export function getLongTermMemory(chatSpaceId) {
+  try {
+    return localStorage.getItem(STORE_PREFIX + chatSpaceId + ":ltm") || "";
+  } catch { return ""; }
+}
+
+export function setLongTermMemory(chatSpaceId, text) {
+  try {
+    localStorage.setItem(STORE_PREFIX + chatSpaceId + ":ltm", String(text).trim());
+  } catch {}
 }
