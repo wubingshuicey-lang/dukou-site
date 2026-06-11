@@ -232,12 +232,17 @@ export default function CharacterModelSettings({ characterId, onSaved, onClose }
               <>
                 <div className="charm-field">
                   <label className="charm-label">生图模型</label>
-                  <input
-                    className="charm-input"
-                    placeholder="如 google/gemini-2.5-flash-image，留空不启用"
-                    value={imageModel}
-                    onChange={(e) => setImageModel(e.target.value)}
-                  />
+                  <select className="charm-input" value={imageModel} onChange={(e) => setImageModel(e.target.value)}>
+                    <option value="">-- 留空不启用 --</option>
+                    <option value="gptimage1.5">gptimage1.5</option>
+                    <option value="openai/gpt-image-2">openai/gpt-image-2</option>
+                    <option value="openai/gpt-image-1.5">openai/gpt-image-1.5</option>
+                    <option value="google/gemini-2.5-flash-image">gemini-2.5-flash-image</option>
+                    <option value="google/gemini-3-pro-image-preview">gemini-3-pro-image</option>
+                  </select>
+                  {imageModel && !["gptimage1.5","openai/gpt-image-2","openai/gpt-image-1.5","google/gemini-2.5-flash-image","google/gemini-3-pro-image-preview"].includes(imageModel) && (
+                    <input className="charm-input" style={{marginTop:4}} value={imageModel} onChange={(e) => setImageModel(e.target.value)} placeholder="自定义模型 ID" />
+                  )}
                 </div>
                 <div className="charm-field">
                   <label className="charm-label">生图 Base URL（独立，留空跟随聊天）</label>
