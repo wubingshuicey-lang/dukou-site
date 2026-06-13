@@ -75,13 +75,27 @@ export function ensureMemoriesSaved(chatSpaceId) {
     const pending = JSON.parse(localStorage.getItem(key) || "[]");
     if (!pending.length) return;
     const token = localStorage.getItem("dukou:apiToken");
-    if (token) {
-      navigator.sendBeacon(
-        `https://dukou-api.wubingshuicey.workers.dev/api/memories/${chatSpaceId}`,
-        JSON.stringify({ items: pending.map((i) => ({ text: i.text, type: i.type || "event", importance: i.importance || 0.5 })) })
-      );
-      localStorage.removeItem(key);
-    }
+    if (!token) return;
+    const body = JSON.stringify({
+      items: pending.map((i) => ({
+        text: i.text,
+        type: i.type || "event",
+        importance: i.importance || 0.5,
+      })),
+    });
+    // 优先 fetch+keepalive（有返回值，失败不删 pending）
+    const apiBase = "https://dukou-api.wubingshuicey.workers.dev/api";
+    fetch(`${apiBase}/memories/${chatSpaceId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body,
+      keepalive: true,
+    })
+      .then((res) => { if (res.ok) localStorage.removeItem(key); })
+      .catch(() => {
+        // fetch 失败，降级 sendBeacon（不删 key，下次重试）
+        navigator.sendBeacon(`${apiBase}/memories/${chatSpaceId}`, body);
+      });
   } catch {}
 }
 

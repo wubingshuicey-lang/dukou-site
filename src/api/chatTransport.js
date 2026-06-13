@@ -1,4 +1,5 @@
 import { callModel } from "./modelClient.js";
+import { chatViaGateway } from "./apiClient.js";
 import { PROVIDER_PRESETS, getModelSettings, getTransportSettings } from "../store/settings.js";
 
 const EMPTY_USAGE = {
@@ -20,8 +21,7 @@ export function normalizeChatTransport(value) {
 }
 
 export function isPlaceholderChatTransport(value) {
-  const chatTransport = normalizeChatTransport(value);
-  return chatTransport === "backend_gateway";
+  return false; // backend_gateway 已实现，不再是占位
 }
 
 export function getChatTransportLabel(value) {
@@ -75,6 +75,38 @@ export async function sendChatRequest({
       },
       signal,
     });
+  }
+
+  if (chatTransport === "backend_gateway") {
+    try {
+      const result = await chatViaGateway({
+        messages,
+        chatSpaceId: transportSettings?.chatSpaceId || "main",
+        systemPrompt,
+        model: modelSettings?.model || "gpt-4o",
+        maxTokens: modelSettings?.maxTokens,
+        temperature: modelSettings?.temperature,
+        signal,
+      });
+      return {
+        ok: true,
+        text: result.text,
+        reasoningContent: result.reasoningContent || "",
+        reasoningSource: undefined,
+        usage: result.usage || EMPTY_USAGE,
+        transport: chatTransport,
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        text: "",
+        reasoningContent: "",
+        reasoningSource: undefined,
+        usage: EMPTY_USAGE,
+        transport: chatTransport,
+        error: { type: "gateway_error", message: error.message },
+      };
+    }
   }
 
   return {

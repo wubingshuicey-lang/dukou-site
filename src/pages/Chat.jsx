@@ -2785,7 +2785,7 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
           onClose={() => setCharacterSettingsOpen(false)}
         />
       )}
-      <MemoryDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      <MemoryDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} chatSpaceId={activeChatSpaceId} />
     </section>
   );
 }

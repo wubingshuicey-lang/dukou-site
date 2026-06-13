@@ -181,8 +181,10 @@ async function migrateLegacyMessages(db) {
       });
       await transactionDone(transaction);
     }
-  } finally {
+    // 只有迁移成功才删除原始数据
     window.localStorage.removeItem(LEGACY_MESSAGES_KEY);
+  } catch {
+    // 迁移失败保留原始数据，下次重试
   }
 }
 

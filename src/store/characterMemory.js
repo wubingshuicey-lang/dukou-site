@@ -44,7 +44,7 @@ export function addMemories(chatSpaceId, items) {
   writeMemories(chatSpaceId, memories);
 
   if (isLoggedIn()) {
-    pushMemories(chatSpaceId, newEntries.map(e => e.text)).catch(() => {});
+    pushMemories(chatSpaceId, newEntries.map(e => ({ text: e.text }))).catch(() => {});
   }
 
   return memories;

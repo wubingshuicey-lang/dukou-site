@@ -3,7 +3,12 @@ import { cors } from "hono/cors";
 
 const app = new Hono();
 
-app.use("*", cors());
+app.use("*", cors({
+  origin: ["https://dukou-site.pages.dev", "https://dukou.pages.dev", "http://localhost:5173"],
+  allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowHeaders: ["Content-Type", "Authorization"],
+  maxAge: 86400,
+}));
 
 // --- JWT helpers using Web Crypto ---
 
@@ -263,6 +268,60 @@ function rowToCharacter(row) {
   };
 }
 
+// --- 情绪-重要性评分（纯本地，不调 API）---
+
+function estimateImportance(text) {
+  let score = 0.5;
+
+  const highEmotionPatterns = [
+    /[！!]{2,}/,
+    /[？?]{2,}/,
+    /[～~…]{2,}/,
+    /好(开心|高兴|激动|兴奋|爽|棒|幸福|快乐)/,
+    /太.*[了啦]/,
+    /太(好了|棒了|牛|强|厉害|开心|高兴|感动|难过了|惨了)/,
+    /爱(你|死|上|惨|了)/,
+    /恨(你|死|不|透)/,
+    /气(死|炸|哭|疯|坏)/,
+    /哭(了|死|泣|惨|过)/,
+    /(永远|一直|绝不|再也|绝对|坚决)/,
+    /(最重要|最关键|必须|一定|肯定|确定)/,
+    /记住[我了]?/,
+    /(梦想|愿望|目标|理想)/,
+    /(害怕|恐惧|怕|担心|焦虑|紧张)/,
+    /(对不起|抱歉|原谅|后悔|自责)/,
+    /(发誓|保证|承诺|约定|说好)/,
+    /(喜欢|超爱|好想|想念|想你了)/,
+    /(孤独|寂寞|难过|伤心|失望|绝望)/,
+    /(第一次|终于|竟然|居然|成功了|考上了|拿到了)/,
+    /(真(的|是)|非常|特别|极其|超级|无比)/,
+    /(啊啊|呜呜|哈哈|嘿嘿|呵呵|哎)/,
+    /(不要|别走|别离开|陪我)/,
+  ];
+
+  const lowEmotionPatterns = [
+    /^(嗯|哦|好|行|可|对|是|吃|睡)[了过]?$/,
+    /^(早安|晚安|早|拜|再见|回头)[了过]?$/,
+  ];
+
+  let hitCount = 0;
+  for (const pattern of highEmotionPatterns) {
+    if (pattern.test(text)) hitCount++;
+  }
+  score = Math.min(1.0, score + hitCount * 0.12);
+
+  for (const pattern of lowEmotionPatterns) {
+    if (pattern.test(text)) score = Math.max(0.2, score - 0.2);
+  }
+
+  // 文字越长越可能重要
+  if (text.length > 50) score = Math.min(1.0, score + 0.05);
+  if (text.length > 150) score = Math.min(1.0, score + 0.05);
+
+  return Math.round(score * 100) / 100;
+}
+
+
 // --- Character Memories (改进版 - 支持向量化) ---
 
 app.get("/api/memories/:chatSpaceId", authMiddleware, async (c) => {
@@ -272,7 +331,7 @@ app.get("/api/memories/:chatSpaceId", authMiddleware, async (c) => {
   const db = c.env.DB;
 
   const rows = await db.prepare(
-    "SELECT * FROM character_memories WHERE user_id = ? AND chat_space_id = ? AND archived = 0 ORDER BY created_at DESC LIMIT ?"
+    "SELECT * FROM character_memories WHERE user_id = ? AND chat_space_id = ? AND archived = 0 AND superseded = 0 ORDER BY pinned DESC, created_at DESC LIMIT ?"
   ).bind(userId, chatSpaceId, limit).all();
 
   return c.json(rows.results.map(rowToMemory));
@@ -287,7 +346,7 @@ app.get("/api/memories/search/:chatSpaceId", authMiddleware, async (c) => {
 
   if (!query.trim()) {
     const rows = await db.prepare(
-      "SELECT * FROM character_memories WHERE user_id = ? AND chat_space_id = ? AND archived = 0 ORDER BY last_accessed DESC LIMIT ?"
+      "SELECT * FROM character_memories WHERE user_id = ? AND chat_space_id = ? AND archived = 0 AND superseded = 0 ORDER BY pinned DESC, last_accessed DESC LIMIT ?"
     ).bind(userId, chatSpaceId, limit).all();
     return c.json(rows.results.map(rowToMemory));
   }
@@ -298,25 +357,32 @@ app.get("/api/memories/search/:chatSpaceId", authMiddleware, async (c) => {
     if (!queryVector) {
       // 降级到全文搜索
       const rows = await db.prepare(
-        `SELECT * FROM character_memories 
-         WHERE user_id = ? AND chat_space_id = ? AND archived = 0 
-         AND (text LIKE ? OR text LIKE ?)
-         ORDER BY created_at DESC LIMIT ?`
+        `SELECT * FROM character_memories
+         WHERE user_id = ? AND chat_space_id = ? AND archived = 0 AND superseded = 0 AND (text LIKE ? OR text LIKE ?)
+         ORDER BY pinned DESC, created_at DESC LIMIT ?`
       ).bind(userId, chatSpaceId, `%${query}%`, `%${query}%`, limit).all();
       return c.json(rows.results.map(rowToMemory));
     }
 
     // 向量检索
     const allMemories = await db.prepare(
-      "SELECT * FROM character_memories WHERE user_id = ? AND chat_space_id = ? AND archived = 0 AND embedding IS NOT NULL"
+      "SELECT * FROM character_memories WHERE user_id = ? AND chat_space_id = ? AND archived = 0 AND superseded = 0 AND embedding IS NOT NULL"
     ).bind(userId, chatSpaceId).all();
 
     const scored = allMemories.results
-      .map(mem => ({
-        ...mem,
-        similarity: cosineSimilarity(queryVector, decodeEmbedding(mem.embedding)),
-      }))
-      .sort((a, b) => b.similarity - a.similarity)
+      .map(mem => {
+        const vectorSim = cosineSimilarity(queryVector, decodeEmbedding(mem.embedding));
+        const heat = calculateEffectiveHeat(mem);
+        // 热度融入相似度：最终得分 = 向量相似度 × 热度（热度永远不归零，保底 0.1）
+        const finalScore = vectorSim * Math.max(0.1, heat);
+        return { ...mem, similarity: finalScore, vectorSimilarity: vectorSim, effectiveHeat: heat };
+      })
+      .sort((a, b) => {
+        // pinned 永远排第一
+        if (a.pinned && !b.pinned) return -1;
+        if (!a.pinned && b.pinned) return 1;
+        return b.similarity - a.similarity;
+      })
       .slice(0, limit);
 
     // 更新访问时间
@@ -344,10 +410,15 @@ app.post("/api/memories/:chatSpaceId", authMiddleware, async (c) => {
   if (items.length === 0) return c.json({ error: "没有要保存的记忆" }, 400);
 
   const stmts = [];
+  const newIds = [];
 
   for (const item of items) {
     const id = `mem-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`;
     const text = String(item.text || "").trim();
+    const importance = estimateImportance(text);
+    const decayFactor = importance > 0.7 ? 0.008 : 0.02;
+
+    newIds.push({ id, text });
 
     let embedding = null;
     try {
@@ -361,22 +432,66 @@ app.post("/api/memories/:chatSpaceId", authMiddleware, async (c) => {
 
     stmts.push(
       db.prepare(`
-        INSERT INTO character_memories 
-        (id, user_id, chat_space_id, text, embedding, embedding_model, semantic_type, importance, reference_message_id, archived)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO character_memories
+        (id, user_id, chat_space_id, text, embedding, embedding_model, semantic_type, importance, reference_message_id, archived, heat, decay_factor)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1.0, ?)
       `).bind(
         id, userId, chatSpaceId, text,
         embedding, embedding ? "text-embedding-3-small" : null,
         item.type || "event",
-        item.importance || 0.5,
+        importance,
         item.referenceMessageId || null,
-        0
+        0,
+        decayFactor
       )
     );
   }
 
   await db.batch(stmts);
+
+  // 对每条新记忆做矛盾检测
+  for (const { id, text } of newIds) {
+    if (!text) continue;
+    try {
+      const vec = await generateEmbedding(text, c.env);
+      if (vec) {
+        await detectAndMarkContradiction(db, userId, chatSpaceId, id, text, encodeEmbedding(vec));
+      }
+    } catch {}
+  }
+
   return c.json({ ok: true, count: items.length }, 201);
+});
+
+// --- 记忆锁定/解锁 ---
+
+app.post("/api/memories/:chatSpaceId/pin/:id", authMiddleware, async (c) => {
+  const userId = c.get("userId");
+  const id = c.req.param("id");
+  const db = c.env.DB;
+
+  const existing = await db.prepare(
+    "SELECT id FROM character_memories WHERE id = ? AND user_id = ?"
+  ).bind(id, userId).first();
+  if (!existing) return c.json({ error: "记忆不存在" }, 404);
+
+  await db.prepare(
+    "UPDATE character_memories SET pinned = 1, updated_at = datetime('now') WHERE id = ?"
+  ).bind(id).run();
+
+  return c.json({ ok: true, pinned: true });
+});
+
+app.delete("/api/memories/:chatSpaceId/pin/:id", authMiddleware, async (c) => {
+  const userId = c.get("userId");
+  const id = c.req.param("id");
+  const db = c.env.DB;
+
+  await db.prepare(
+    "UPDATE character_memories SET pinned = 0, updated_at = datetime('now') WHERE id = ? AND user_id = ?"
+  ).bind(id, userId).run();
+
+  return c.json({ ok: true, pinned: false });
 });
 
 app.get("/api/memories/:chatSpaceId/stats", authMiddleware, async (c) => {
@@ -409,9 +524,31 @@ function rowToMemory(row) {
     importance: row.importance || 0.5,
     hasEmbedding: !!row.embedding,
     archived: !!row.archived,
+    superseded: !!row.superseded,
+    pinned: !!row.pinned,
+    heat: row.heat || 1.0,
+    decayFactor: row.decay_factor || 0.02,
     lastAccessed: row.last_accessed,
     createdAt: row.created_at,
   };
+}
+
+// --- 记忆热度计算 ---
+function calculateEffectiveHeat(mem) {
+  const now = new Date();
+  const createdAt = new Date(mem.created_at);
+  const daysSinceCreation = (now - createdAt) / (1000 * 60 * 60 * 24);
+  const heat = mem.heat || 1.0;
+  const decayFactor = mem.decay_factor || 0.02;
+  // 热度指数衰减：heat × e^(-decay_factor × 天数)
+  let effectiveHeat = heat * Math.exp(-decayFactor * daysSinceCreation);
+  // 被访问过的记忆热度回升 10%
+  if (mem.last_accessed) {
+    const daysSinceAccess = (now - new Date(mem.last_accessed)) / (1000 * 60 * 60 * 24);
+    effectiveHeat = effectiveHeat * (1 + 0.1 * Math.exp(-0.05 * daysSinceAccess));
+  }
+  // 限制在 0 ~ 1.2 之间
+  return Math.min(1.2, Math.max(0, effectiveHeat));
 }
 
 // --- Messages ---
@@ -512,6 +649,36 @@ function rowToMessage(row) {
   };
 }
 
+// --- 矛盾检测 ---
+
+const NEGATION_WORDS = ["不", "没", "别", "从不", "绝不", "再也", "永远不", "绝对不"];
+function hasNegation(text) { return NEGATION_WORDS.some(w => (text || "").includes(w)); }
+function hasNegationFlip(a, b) { return hasNegation(a) !== hasNegation(b); }
+
+async function detectAndMarkContradiction(db, userId, chatSpaceId, newId, newText, newEmbedding) {
+  if (!newEmbedding) return;
+  const rows = await db.prepare(
+    "SELECT id, text, embedding FROM character_memories WHERE user_id = ? AND chat_space_id = ? AND archived = 0 AND superseded = 0 AND embedding IS NOT NULL ORDER BY created_at DESC LIMIT 30"
+  ).bind(userId, chatSpaceId).all();
+  if (!rows.results.length) return;
+
+  const newVec = typeof newEmbedding === "string" ? JSON.parse(newEmbedding) : newEmbedding;
+  let best = null, bestSim = 0;
+  for (const mem of rows.results) {
+    const oldVec = typeof mem.embedding === "string" ? JSON.parse(mem.embedding) : mem.embedding;
+    if (!oldVec) continue;
+    const sim = cosineSimilarity(newVec, oldVec);
+    if (sim > 0.75 && sim > bestSim && hasNegationFlip(newText, mem.text)) {
+      best = mem; bestSim = sim;
+    }
+  }
+  if (best) {
+    await db.prepare(
+      "UPDATE character_memories SET superseded = 1, superseded_at = datetime('now'), superseded_by = ? WHERE id = ?"
+    ).bind(newId, best.id).run();
+  }
+}
+
 // --- 向量化辅助函数 ---
 
 async function generateEmbedding(text, env) {
@@ -590,8 +757,126 @@ function cosineSimilarity(a, b) {
   return dotProduct / (normA * normB);
 }
 
+// --- Chat (backend_gateway) ---
+
+app.post("/api/chat", authMiddleware, async (c) => {
+  const userId = c.get("userId");
+  const body = await c.req.json();
+  const { chatSpaceId, messages, model, systemPrompt, maxTokens, temperature } = body;
+
+  if (!messages?.length) return c.json({ error: "消息不能为空" }, 400);
+
+  const apiKey = c.env.OPENAI_API_KEY;
+  if (!apiKey) return c.json({ error: "未配置 API Key" }, 500);
+  const baseUrl = (c.env.EMBEDDING_BASE_URL || "https://api.openai.com/v1").replace(/\/+$/, "");
+  const db = c.env.DB;
+
+  // 搜索相关记忆注入上下文
+  let memoryContext = "";
+  if (chatSpaceId) {
+    try {
+      const lastUserMsg = [...messages].reverse().find(m => m.role === "user");
+      if (lastUserMsg?.content) {
+        const vec = await generateEmbedding(lastUserMsg.content.slice(0, 512), c.env);
+        if (vec) {
+          const rows = await db.prepare(
+            "SELECT * FROM character_memories WHERE user_id = ? AND chat_space_id = ? AND archived = 0 AND superseded = 0 AND embedding IS NOT NULL"
+          ).bind(userId, chatSpaceId).all();
+          const scored = rows.results
+            .map(mem => {
+              const sim = cosineSimilarity(vec, decodeEmbedding(mem.embedding));
+              const heat = calculateEffectiveHeat(mem);
+              return { text: mem.text, score: sim * Math.max(0.1, heat), pinned: mem.pinned };
+            })
+            .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || b.score - a.score)
+            .slice(0, 5);
+          if (scored.length) memoryContext = scored.map(m => m.text).join("\n");
+        }
+      }
+    } catch {}
+  }
+
+  // 组装消息发中转站
+  const chatMessages = messages.map(m => ({ role: m.role, content: m.content }));
+  let finalSystem = systemPrompt || "";
+  if (memoryContext) finalSystem = `${finalSystem}\n\n【相关记忆】\n${memoryContext}`.trim();
+  if (finalSystem) chatMessages.unshift({ role: "system", content: finalSystem });
+
+  try {
+    const resp = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: model || "gpt-4o",
+        messages: chatMessages,
+        max_tokens: maxTokens || 1000,
+        temperature: temperature ?? 0.8,
+      }),
+    });
+
+    if (!resp.ok) {
+      const errText = await resp.text().catch(() => "");
+      return c.json({ error: `模型请求失败: ${resp.status}`, detail: errText.slice(0, 200) }, 502);
+    }
+
+    const data = await resp.json();
+    const reply = data.choices?.[0]?.message?.content || "";
+
+    return c.json({
+      ok: true,
+      text: reply,
+      reasoningContent: data.choices?.[0]?.message?.reasoning_content || "",
+      usage: data.usage || {},
+      memoryContext: memoryContext || undefined,
+    });
+  } catch (err) {
+    return c.json({ error: `请求异常: ${err.message}` }, 502);
+  }
+});
+
+// --- Image Generation ---
+
+app.post("/api/images", authMiddleware, async (c) => {
+  const body = await c.req.json();
+  const { prompt, size, n } = body;
+  if (!prompt) return c.json({ error: "prompt 不能为空" }, 400);
+
+  const apiKey = c.env.OPENAI_API_KEY;
+  if (!apiKey) return c.json({ error: "未配置 API Key" }, 500);
+  const baseUrl = (c.env.EMBEDDING_BASE_URL || "https://api.openai.com/v1").replace(/\/+$/, "");
+
+  try {
+    const resp = await fetch(`${baseUrl}/images/generations`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt,
+        model: body.model || "google/gemini-2.5-flash-image",
+        n: n || 1,
+        size: size || "1024x1024",
+      }),
+    });
+    if (!resp.ok) {
+      const errText = await resp.text().catch(() => "");
+      return c.json({ error: `生图失败: ${resp.status}`, detail: errText.slice(0, 200) }, 502);
+    }
+    const data = await resp.json();
+    return c.json({ ok: true, images: data.data || data.images || [] });
+  } catch (err) {
+    return c.json({ error: `请求异常: ${err.message}` }, 502);
+  }
+});
+
 // --- Health ---
 
 app.get("/api/health", (c) => c.json({ ok: true, time: new Date().toISOString() }));
+
+app.get("/api/debug/emotion", (c) => {
+  const text = c.req.query("text") || "我考上研究生了！！！太开心了";
+  const score = estimateImportance(text);
+  return c.json({ text, score });
+});
+
+export { scheduled } from "./dream.js";
 
 export default app;

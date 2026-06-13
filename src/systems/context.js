@@ -38,10 +38,14 @@ export const DEFAULT_SYSTEM_PROMPT = `你叫机。你和我很熟。中文回复
 - 例：对方问"在干嘛呢" → 可以回 <split>刚洗完澡<image>浴室暖黄灯光，镜子起了一层雾，头发还滴着水披在肩上，穿着白色浴袍，脸颊微红对着镜头笑</image><split>想我了？</split>`;
 
 function formatMemoryLine(memory) {
-  const category = [memory.level2_category, memory.level3_theme].filter(Boolean).join(" / ") || "记忆";
-  const date = memory.conversation_date ? `，${memory.conversation_date}` : "";
-  const weight = typeof memory.weight === "number" ? `，weight ${memory.weight}` : "";
-  return `- [${category}] ${memory.summary}（${[date, weight].join("").replace(/^，/, "") || "无日期"}）`;
+  // Worker new format (text/type) and old mock format (summary/level2_category)
+  const content = memory.summary || memory.text || '';
+  const memType = memory.type || memory.level2_category || 'memory';
+  const category = [memType, memory.level3_theme].filter(Boolean).join(' / ') || memType;
+  const date = memory.conversation_date || memory.createdAt || '';
+  const dateStr = date ? '，' + date.slice(0, 10) : '';
+  const weight = typeof memory.weight === 'number' ? '，weight ' + memory.weight : '';
+  return '- [' + category + '] ' + content + '（' + (dateStr + weight).replace(/^，/, '') || 'nodate' + '）';
 }
 
 function replaceToken(template, token, value) {
@@ -73,7 +77,16 @@ function normalizeInjectedMemory(memory) {
 
 export function formatMemoryBlock(memories) {
   if (!memories?.length) return "暂无可用长期记忆。";
-  return memories.map(formatMemoryLine).join("\n");
+  // dream_summary first, pinned second
+  const sorted = [...memories].sort((a, b) => {
+    const aDream = (a.type || a.semantic_type) === 'dream_summary' ? 0 : 1;
+    const bDream = (b.type || b.semantic_type) === 'dream_summary' ? 0 : 1;
+    if (aDream !== bDream) return aDream - bDream;
+    if (a.pinned && !b.pinned) return -1;
+    if (!a.pinned && b.pinned) return 1;
+    return 0;
+  });
+  return sorted.map(formatMemoryLine).join('\n');
 }
 
 export function getEmotionHint(emotion) {

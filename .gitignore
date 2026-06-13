@@ -35,3 +35,4 @@ memory*.json
 notion*.json
 supabase*.json
 obsidian/
+.wrangler/

@@ -135,6 +135,16 @@ export async function searchMemories(chatSpaceId, query, limit = 5) {
   return apiFetch(url);
 }
 
+// --- Memory Pin ---
+
+export async function pinMemory(chatSpaceId, memoryId) {
+  return apiFetch(`/memories/${chatSpaceId}/pin/${memoryId}`, { method: "POST" });
+}
+
+export async function unpinMemory(chatSpaceId, memoryId) {
+  return apiFetch(`/memories/${chatSpaceId}/pin/${memoryId}`, { method: "DELETE" });
+}
+
 export async function fetchMemoryStats(chatSpaceId) {
   return apiFetch(`/memories/${chatSpaceId}/stats`);
 }
@@ -158,5 +168,47 @@ export async function updateMsg(msgId, patch) {
   return apiFetch(`/messages/${msgId}`, {
     method: "PUT",
     body: JSON.stringify(patch),
+  });
+}
+
+// --- Chat via Worker (backend_gateway) ---
+
+export async function chatViaGateway({ messages, chatSpaceId, systemPrompt, model, maxTokens, temperature, signal }) {
+  const token = getToken();
+  if (!token) throw new Error("未登录");
+
+  const controller = new AbortController();
+  const linkedSignal = signal
+    ? (signal.addEventListener("abort", () => controller.abort()), signal)
+    : null;
+
+  const timer = setTimeout(() => controller.abort(), 30000);
+  try {
+    const res = await fetch(`${API_BASE}/chat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ messages, chatSpaceId, systemPrompt, model, maxTokens, temperature }),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "请求失败");
+    return data;
+  } catch (err) {
+    clearTimeout(timer);
+    if (err.name === "AbortError") throw new Error("请求超时");
+    throw err;
+  }
+}
+
+// --- Image Generation via Worker ---
+
+export async function generateImageViaGateway({ prompt, size, n }) {
+  return apiFetch("/images", {
+    method: "POST",
+    body: JSON.stringify({ prompt, size, n }),
   });
 }
