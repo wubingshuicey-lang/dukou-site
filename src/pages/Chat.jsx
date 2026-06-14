@@ -1611,9 +1611,11 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
           return;
         }
 
-        // load cloud messages first, then local (local takes precedence for duplicates)
-        await loadCloudMessages(chatSpaceId, 50);
-        const recent = await getRecentMessages(50, { conversationId: chatSpaceId });
+        // 并行：本地 IndexedDB 秒开，云端后台同步不阻塞
+        const [_, recent] = await Promise.all([
+          loadCloudMessages(chatSpaceId, 50).catch(() => []),
+          getRecentMessages(50, { conversationId: chatSpaceId }),
+        ]);
         await markDuMessagesRead({ conversationId: chatSpaceId });
         if (cancelled) return;
         const readMessages = recent.map((message) =>
