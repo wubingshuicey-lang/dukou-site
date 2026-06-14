@@ -247,7 +247,7 @@ export async function saveMessage(message) {
 
   // background cloud sync
   if (isLoggedIn()) {
-    apiPushMessage(record).catch(() => {});
+    apiPushMessage(record).catch((err) => console.warn("消息同步失败:", err.message));
   }
 
   return record;
