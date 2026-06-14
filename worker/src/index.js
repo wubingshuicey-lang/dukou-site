@@ -874,6 +874,43 @@ app.post("/api/images", authMiddleware, async (c) => {
   }
 });
 
+// --- Kiwi-Mem Proxy (VPS via serveo) ---
+
+const KIWI_BASE = "http://9519f89675ead802-151-245-90-140.serveousercontent.com/v1";
+
+// OpenAI-compatible /v1/chat/completions → 转发到 kiwi-mem
+app.post("/v1/chat/completions", authMiddleware, async (c) => {
+  const body = await c.req.json();
+  const { messages, model, max_tokens, temperature, stream } = body;
+  if (!messages?.length) return c.json({ error: "messages empty" }, 400);
+
+  // 提取 system prompt（kiwi-mem 会自动注入记忆）
+  const systemMsg = messages.find(m => m.role === "system");
+  const chatMessages = messages.filter(m => m.role !== "system");
+
+  try {
+    const resp = await fetch(`${KIWI_BASE}/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: model || "qwen-plus-2025-12-01",
+        messages: systemMsg ? [systemMsg, ...chatMessages] : chatMessages,
+        max_tokens: max_tokens || 1000,
+        temperature: temperature ?? 0.8,
+        stream: stream || false,
+      }),
+    });
+    if (!resp.ok) {
+      const txt = await resp.text().catch(() => "");
+      return c.json({ error: `kiwi-mem: ${resp.status}`, detail: txt.slice(0, 200) }, 502);
+    }
+    const data = await resp.json();
+    return c.json(data);
+  } catch (err) {
+    return c.json({ error: `kiwi-mem unreachable: ${err.message}` }, 502);
+  }
+});
+
 // --- Health ---
 
 app.get("/api/health", (c) => c.json({ ok: true, time: new Date().toISOString() }));

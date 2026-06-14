@@ -59,7 +59,7 @@ export const PROVIDER_PRESETS = {
   kiwi_local: {
     label: "Kiwi Local",
     apiStyle: "openai_compatible",
-    baseUrl: "http://127.0.0.1:8080/v1",
+    baseUrl: "https://dukou-api.wubingshuicey.workers.dev/v1",
     defaultModel: "qwen-plus-2025-12-01",
   },
   custom_openai_compatible: {
