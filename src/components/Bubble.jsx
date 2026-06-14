@@ -277,6 +277,7 @@ export default function Bubble({
                       className="bubble-image"
                       src={message.imageUrl}
                       alt={message.content || "图片"}
+                      loading="lazy"
                       onClick={() => {
                         if (!readOnly && message.imageUrl) {
                           window.open(message.imageUrl, "_blank");

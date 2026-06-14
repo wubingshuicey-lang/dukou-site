@@ -74,5 +74,5 @@ export async function updateMessageRecord(id, patch) {
 }
 
 export async function clearLocalMessages() {
-  return clearMessageArchive();
+  return clearMessageArchive({ requireConfirmation: true });
 }

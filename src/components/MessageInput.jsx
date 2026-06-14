@@ -29,7 +29,12 @@ function compressImage(file, maxSize) {
         reader.readAsDataURL(blob);
       }, "image/jpeg", 0.85);
     };
-    img.src = URL.createObjectURL(file);
+    const objectUrl = URL.createObjectURL(file);
+    img.src = objectUrl;
+    // 释放 blob URL（M1）
+    const revoke = () => { URL.revokeObjectURL(objectUrl); img.removeEventListener('load', revoke); img.removeEventListener('error', revoke); };
+    img.addEventListener('load', revoke);
+    img.addEventListener('error', revoke);
   });
 }
 

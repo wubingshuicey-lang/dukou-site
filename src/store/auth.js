@@ -2,7 +2,7 @@ const STORAGE_KEY = "dukou:auth";
 
 export function checkPassword(input) {
   const stored = localStorage.getItem(STORAGE_KEY);
-  const password = stored || "1234567";
+  const password = stored || crypto.randomUUID();
   return input === password;
 }
 

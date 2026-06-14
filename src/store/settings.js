@@ -195,6 +195,12 @@ function mergeModelSettings(value) {
     merged.apiKey = "";
   }
 
+  // api_format 白名单校验（13: XSS 防御）
+  const ALLOWED_API_FORMATS = ["openai", "anthropic", "openai_compatible"];
+  if (merged.apiStyle && !ALLOWED_API_FORMATS.includes(merged.apiStyle)) {
+    merged.apiStyle = "openai_compatible";
+  }
+
   return merged;
 }
 

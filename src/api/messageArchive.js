@@ -461,7 +461,8 @@ export async function getMessageArchiveStats({ conversationId = DEFAULT_CONVERSA
   };
 }
 
-export async function clearMessageArchive() {
+export async function clearMessageArchive({ requireConfirmation = false } = {}) {
+  if (!requireConfirmation) throw new Error("必须确认才能清空所有聊天数据");
   const db = await getReadyDb();
   const transaction = db.transaction(MESSAGE_STORE, "readwrite");
   transaction.objectStore(MESSAGE_STORE).clear();
