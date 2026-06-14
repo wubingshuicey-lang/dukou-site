@@ -99,10 +99,10 @@ const HELP_TEXT = {
   apiChatCompletions: "未来后端兼容的聊天入口。前端发聊天请求到这里，再由后端转给模型或记忆网关。",
   apiMemoryStatus: "未来只读查看记忆网关是否可用，不读取记忆库内部正文。",
   apiMemoryPreview: "未来只读预览少量记忆摘要或状态。当前未接入，也不展示真实长期记忆正文。",
-  imageRoute: "未来生图能力的路由名。当前未接入，不调用生图 API，也不在前端保存媒体 Key。",
-  voiceRoute: "未来语音能力的路由名。当前未接入，不请求麦克风，也不调用 ASR/TTS。",
+  imageRoute: "生图能力路由。走 Worker /api/images 或直连生图 API，key 可独立配置。",
+  voiceRoute: "语音能力路由。ElevenLabs TTS 已接入；STT 语音转文字已接入。",
   subAgentModels: "未来给摘要、日记、情绪、工具等任务选择模型。当前只是占位，不保存真实配置。",
-  backendTools: "未来由后端管理的工具状态，比如导出、MCP、通知、生图和语音。当前不调用真实工具。",
+  backendTools: "后端工具状态。生图/语音已接入，导出/MCP/通知为占位。",
   providerModel: "当前模型接入页保存的 provider 和 model，只读展示，不是第二套配置。",
   baseUrl: "当前模型接入页保存的 Base URL。这里只显示地址本身，不展示 API key 或请求头。",
   memoryOwnership: "长期记忆是否交给外部记忆网关处理。这里不读取内部数据库，也不展示记忆正文。",
@@ -1875,9 +1875,9 @@ function CapabilityRoutesPage({ settings, logs, onBack, onOpen }) {
     <>
       <SubHeader title='前端能力路由' onBack={onBack} />
       <div className='settings-scroll'>
-        <InlineNotice>主聊天是当前唯一真实可用的能力路由。生图和语音只做后端预留，不请求文件、录音或麦克风权限。</InlineNotice>
+        <InlineNotice>下面三个能力路由均已接入。选 backend_gateway 走 Worker 代理，key 不暴露。</InlineNotice>
         <div className='runtime-route-list'>
-          <CapabilityCard title='主聊天' status={getLatestRouteStatus(chatTransport)} topic={routeTopic}>
+          <CapabilityCard title='主聊天' status={chatTransport === "backend_gateway" ? "已接入" : chatTransport === "direct_model" ? "已接入（直连）" : chatTransport === "kiwi_direct" ? "已接入（Kiwi）" : "Mock"} topic={routeTopic}>
             <DataRow label='chatTransport' value={chatTransport} topic='chatTransport' />
             <DataRow label='provider / model' value={providerLabel(settings.model.provider) + ' / ' + (settings.model.model || '未填写')} />
             <DataRow label='最近一次请求' value={latestLog ? (statusLabels[latestLog.status] || latestLog.status) + ' · ' + (latestLog.chatTransport || chatTransport) : '暂无'} topic='contextLog' />
@@ -1887,16 +1887,16 @@ function CapabilityRoutesPage({ settings, logs, onBack, onOpen }) {
             </div>
           </CapabilityCard>
 
-          <CapabilityCard title='生图' status='后端预留，未接入' topic='imageRoute'>
-            <DataRow label='未来 route' value='backend_gateway:image.generate' topic='imageRoute' />
-            <DataRow label='API key' value='由未来后端管理，前端不保存' topic='apiKeyConfigured' />
-            <DataRow label='当前行为' value='不调用真实生图 API' />
+          <CapabilityCard title='生图' status={settings.model.imageApiKey || settings.model.provider ? "已接入" : "未配置 key"} topic='imageRoute'>
+            <DataRow label='route' value={chatTransport === "backend_gateway" ? 'Worker /api/images' : '直连生图 API'} topic='imageRoute' />
+            <DataRow label='生图 Key' value={settings.model.imageApiKey ? '已配置（独立）' : settings.model.apiKey ? '跟随聊天 Key' : '未配置'} topic='apiKeyConfigured' />
+            <DataRow label='当前行为' value='可调用真实生图 API' />
           </CapabilityCard>
 
-          <CapabilityCard title='语音' status='后端预留，未接入' topic='voiceRoute'>
-            <DataRow label='未来 route' value='backend_gateway:voice' topic='voiceRoute' />
-            <DataRow label='未来能力' value='ASR / TTS / 录音占位' />
-            <DataRow label='当前行为' value='不请求麦克风，不调用语音 API' />
+          <CapabilityCard title='语音' status={settings.elevenlabs?.apiKey ? "已接入" : "未配置 ElevenLabs"} topic='voiceRoute'>
+            <DataRow label='TTS' value={settings.elevenlabs?.apiKey ? 'ElevenLabs 已配置' : '未配置'} topic='voiceRoute' />
+            <DataRow label='STT' value='whisper-1 已接入' />
+            <DataRow label='当前行为' value='可调用真实语音 API' />
           </CapabilityCard>
         </div>
       </div>
