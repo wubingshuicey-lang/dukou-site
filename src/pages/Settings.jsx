@@ -1907,36 +1907,31 @@ function CapabilityRoutesPage({ settings, logs, onBack, onOpen }) {
 
 function MemoryStatusPage({ settings, logs, onBack }) {
   const chatTransport = settings.transport?.chatTransport || DEFAULT_TRANSPORT_SETTINGS.chatTransport;
-  const memoryConnection = getMemoryConnectionLabel(logs, chatTransport);
-  const memoryRequest = logs.find((log) => ['kiwi_direct', 'backend_gateway'].includes(log.chatTransport));
-  const usesMemoryGateway = ['kiwi_direct', 'backend_gateway'].includes(chatTransport) ? chatTransport : '否';
-  const memoryTopic = chatTransport === 'kiwi_direct' ? 'kiwiDirect' : 'backendGateway';
+  const usesMemory = ["backend_gateway", "kiwi_direct"].includes(chatTransport);
 
   return (
     <>
       <SubHeader title='记忆库状态' onBack={onBack} />
       <div className='settings-scroll'>
-        <InlineNotice>记忆库状态只显示AI 陪伴前端是否正在把长期记忆交给外部记忆网关处理。这里不是记忆编辑后台。</InlineNotice>
-        <Section title='当前状态'>
+        <InlineNotice>记忆由 Cloudflare Worker (D1 + 向量搜索) 管理。不依赖外部记忆网关。</InlineNotice>
+        <Section title='记忆引擎'>
           <div className='runtime-status-grid'>
-            <StatusCard label='当前记忆模式' value={settings.memory.memoryMode} topic='memoryMode' />
-            <StatusCard label='聊天通道是否走记忆库' value={usesMemoryGateway} topic={memoryTopic} />
-            <StatusCard label='记忆库连接状态' value={memoryConnection} />
-            <StatusCard label='当前 Base URL' value={safeBaseUrl(settings.model.baseUrl)} topic='baseUrl' />
-            <StatusCard label='长期记忆接管' value={settings.memory.memoryMode === 'kiwi_managed' ? '已交给外部记忆网关' : '未接管'} topic='memoryOwnership' />
-            <StatusCard label='Dream / digest' value={settings.memory.memoryMode === 'kiwi_managed' ? '由记忆库管理' : '未接入 / 占位'} topic='dreamDigest' />
+            <StatusCard label='记忆后端' value='Worker / D1' sub='dukou-api.wubingshuicey.workers.dev' />
+            <StatusCard label='向量搜索' value='✅ ZenMux text-embedding-3-small' />
+            <StatusCard label='热度衰减' value='✅ heat × e^(-decay×天)' />
+            <StatusCard label='Dream 自动总结' value='✅ 每天 UTC 2:00 (北京 10:00)' sub='cron 0 2 * * *' />
+            <StatusCard label='记忆锁定' value='✅ pin/unpin API + 前端 📌' />
+            <StatusCard label='矛盾检测' value='✅ 否定翻转 + 向量相似 >0.75' />
+            <StatusCard label='情绪标记' value='✅ 23组正则规则引擎' />
+            <StatusCard label='kiwi-mem (VPS)' value={usesMemory && chatTransport === "kiwi_direct" ? '✅ 已接入' : '未使用'} sub='serveo tunnel' />
           </div>
         </Section>
-        <Section title='最近记忆库请求'>
-          {memoryRequest ? (
-            <div className='runtime-data-list'>
-              <DataRow label='通道' value={memoryRequest.chatTransport} topic={memoryRequest.chatTransport === 'kiwi_direct' ? 'kiwiDirect' : 'backendGateway'} />
-              <DataRow label='状态' value={statusLabels[memoryRequest.status] || memoryRequest.status} topic='contextLog' />
-              <DataRow label='时间' value={formatDateTime(memoryRequest.createdAt)} />
-            </div>
-          ) : (
-            <p className='settings-empty'>暂无 kiwi_direct 或 backend_gateway 相关请求记录。</p>
-          )}
+        <Section title='通道'>
+          <div className='runtime-data-list'>
+            <DataRow label='chatTransport' value={chatTransport} />
+            <DataRow label='记忆注入方式' value={usesMemory ? 'Worker 自动注入（向量搜索 + 热度排序）' : '直连模式不注入记忆'} />
+            <DataRow label='Base URL' value={safeBaseUrl(settings.model.baseUrl)} topic='baseUrl' />
+          </div>
         </Section>
       </div>
     </>
