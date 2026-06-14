@@ -92,7 +92,7 @@ const HELP_TEXT = {
   indexedDbArchive: "IndexedDB 是浏览器本机的小数据库，用来存完整聊天归档，不会自动上传到云端。",
   apiKeyConfigured: "这里只显示是否填过 Key，不展示 Key 内容。kiwi_direct 和 backend_gateway 不要求前端保存真实模型 Key。",
   kiwiDirect: "kiwi_direct 会让前端请求本机 kiwi-mem 验证入口。它适合本地验证，长期使用仍建议改走后端。",
-  backendGateway: "backend_gateway 是未来 Node 后端入口。当前只保存和展示占位，不会发起真实后端请求。",
+  backendGateway: "Cloudflare Worker 已替代原计划 Node 后端。本页显示真实 Worker 端点状态。",
   apiHealth: "未来用来问后端是否还活着。当前未接入，不会真的请求。",
   apiAdminStatus: "未来用来读取后端运行状态，比如工具开关和路由状态。当前未接入。",
   apiAdminConfig: "未来用来读取或修改后端保存的配置，比如子代理模型、工具开关、能力路由。真实 API key 仍然只放后端，不展示给前端。",
@@ -776,6 +776,7 @@ function SettingsHome({ settings, modelStatus, homeScrollTop = 0, onHomeScrollCh
   const runtimeEntries = [
     { id: "systemOverview", title: "系统总览", sub: "当前运行模式、最近请求和本地数据摘要", keywords: "运行 系统 总览 chatTransport memoryMode provider model baseUrl api key contextLog 本地数据" },
     { id: "capabilityRoutes", title: "前端能力路由", sub: "主聊天、生图、语音的当前入口状态", keywords: "能力 路由 主聊天 生图 语音 backend_gateway image generate voice kiwi_direct direct_model" },
+    { id: "backendGateway", title: "后端网关", sub: "Worker 端点状态、kiwi-mem 连接", keywords: "backend gateway api health chat images memories kiwi worker" },
     { id: "memoryStatus", title: "记忆库状态", sub: "外部记忆网关接管状态，只读显示", keywords: "记忆库 状态 kiwi_managed kiwi_direct dream digest base url 长期记忆" },
     { id: "localData", title: "本地数据与日志", sub: "聊天归档、contextLogs、功能页本地数据", keywords: "本地数据 日志 IndexedDB contextLogs 潮汐标本 localUserId ui settings 清理 危险区" },
   ];
@@ -1954,26 +1955,26 @@ function GatewayContractRow({ method, path, topic }) {
 function BackendGatewayPage({ onBack }) {
   return (
     <>
-      <SubHeader title='Backend Gateway' onBack={onBack} />
+      <SubHeader title='后端网关' onBack={onBack} />
       <div className='settings-scroll'>
-        <InlineNotice>本页只做未来后端占位和边界说明。本轮不创建 Node / Express 后端，也不请求真实 /api/*。</InlineNotice>
-        <Section title='网关占位'>
+        <InlineNotice>Cloudflare Worker 已替代原计划的 Node 后端。以下为当前 Worker 真实端点。</InlineNotice>
+        <Section title='Worker 端点状态'>
           <div className='runtime-status-grid'>
-            <StatusCard label='连接状态' value='未接入' sub='未来检测 /api/health' topic='apiHealth' />
-            <StatusCard label='配置状态' value='未接入' sub='未来读取和修改后端配置' topic='apiAdminConfig' />
-            <StatusCard label='子代理模型' value='占位' sub='summary / diary / emotion / tool' topic='subAgentModels' />
-            <StatusCard label='后端工具' value='占位' sub='Obsidian、MCP、唤醒、生图、语音、通知' topic='backendTools' />
+            <StatusCard label='Health' value='✅ 在线' sub='dukou-api.wubingshuicey.workers.dev' />
+            <StatusCard label='/api/chat' value='已接入' sub='前端 backend_gateway → Worker → 聊天模型' />
+            <StatusCard label='/api/images' value='已接入' sub='前端 → Worker → 生图模型' />
+            <StatusCard label='/v1/chat/completions' value='已接入' sub='前端 kiwi_direct → Worker → VPS kiwi-mem' />
           </div>
         </Section>
-        <Section title='最小接口契约'>
+        <Section title='其余端点'>
           <div className='gateway-contract-list'>
-            <GatewayContractRow method='GET' path='/api/health' topic='apiHealth' />
-            <GatewayContractRow method='GET' path='/api/admin/status' topic='apiAdminStatus' />
-            <GatewayContractRow method='GET' path='/api/admin/config' topic='apiAdminConfig' />
-            <GatewayContractRow method='PATCH' path='/api/admin/config' topic='apiAdminConfig' />
-            <GatewayContractRow method='POST' path='/v1/chat/completions' topic='apiChatCompletions' />
-            <GatewayContractRow method='GET' path='/api/memory/status' topic='apiMemoryStatus' />
-            <GatewayContractRow method='GET' path='/api/memory/preview' topic='apiMemoryPreview' />
+            <GatewayContractRow method='POST' path='/api/auth/register' />
+            <GatewayContractRow method='POST' path='/api/auth/login' />
+            <GatewayContractRow method='GET/PUT' path='/api/settings' />
+            <GatewayContractRow method='CRUD' path='/api/characters' />
+            <GatewayContractRow method='CRUD' path='/api/messages' />
+            <GatewayContractRow method='CRUD+search+pin' path='/api/memories' />
+            <GatewayContractRow method='GET' path='/api/health' />
           </div>
         </Section>
       </div>
