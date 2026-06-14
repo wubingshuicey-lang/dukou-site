@@ -206,9 +206,9 @@ export async function chatViaGateway({ messages, chatSpaceId, systemPrompt, mode
 
 // --- Image Generation via Worker ---
 
-export async function generateImageViaGateway({ prompt, size, n }) {
+export async function generateImageViaGateway({ prompt, size, n, apiKey, baseUrl }) {
   return apiFetch("/images", {
     method: "POST",
-    body: JSON.stringify({ prompt, size, n }),
+    body: JSON.stringify({ prompt, size, n, apiKey, baseUrl }),
   });
 }

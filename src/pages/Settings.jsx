@@ -777,7 +777,6 @@ function SettingsHome({ settings, modelStatus, homeScrollTop = 0, onHomeScrollCh
     { id: "systemOverview", title: "系统总览", sub: "当前运行模式、最近请求和本地数据摘要", keywords: "运行 系统 总览 chatTransport memoryMode provider model baseUrl api key contextLog 本地数据" },
     { id: "capabilityRoutes", title: "前端能力路由", sub: "主聊天、生图、语音的当前入口状态", keywords: "能力 路由 主聊天 生图 语音 backend_gateway image generate voice kiwi_direct direct_model" },
     { id: "memoryStatus", title: "记忆库状态", sub: "外部记忆网关接管状态，只读显示", keywords: "记忆库 状态 kiwi_managed kiwi_direct dream digest base url 长期记忆" },
-    { id: "backendGateway", title: "Backend Gateway", sub: "未来后端连接、配置、工具和接口占位", keywords: "backend gateway api health admin config chat completions memory status preview 子代理 工具" },
     { id: "localData", title: "本地数据与日志", sub: "聊天归档、contextLogs、功能页本地数据", keywords: "本地数据 日志 IndexedDB contextLogs 潮汐标本 localUserId ui settings 清理 危险区" },
   ];
   const normalizedQuery = query.trim().toLowerCase();
@@ -1593,7 +1592,7 @@ function MemoryContextSettingsPage({ settings, onBack, onRequestLeave, onSave, s
             />
           </Row>
           {draftTransport.chatTransport === "kiwi_direct" && <InlineNotice>kiwi_direct 会请求本机 kiwi-mem；建议搭配 Kiwi Local 与 kiwi_managed。</InlineNotice>}
-          {draftTransport.chatTransport === "backend_gateway" && <InlineNotice>backend_gateway 仅保存未来接口占位。本轮不会请求 Node / Express 后端。</InlineNotice>}
+          {draftTransport.chatTransport === "backend_gateway" && <InlineNotice>已接通 Worker /api/chat。聊天经 Cloudflare 边缘节点代理，key 不暴露。</InlineNotice>}
           <Row label="注入记忆数量">
             <input
               className="settings-control"

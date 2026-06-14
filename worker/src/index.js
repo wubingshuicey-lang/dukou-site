@@ -845,12 +845,13 @@ app.post("/api/chat", authMiddleware, async (c) => {
 
 app.post("/api/images", authMiddleware, async (c) => {
   const body = await c.req.json();
-  const { prompt, size, n } = body;
+  const { prompt, size, n, apiKey: reqKey, baseUrl: reqBase } = body;
   if (!prompt) return c.json({ error: "prompt 不能为空" }, 400);
 
-  const apiKey = c.env.OPENAI_API_KEY;
+  // 优先用请求里带的 key（前端设置页填的生图专用key），否则用 Zenmux key
+  const apiKey = reqKey || c.env.OPENAI_API_KEY;
   if (!apiKey) return c.json({ error: "未配置 API Key" }, 500);
-  const baseUrl = (c.env.EMBEDDING_BASE_URL || "https://api.openai.com/v1").replace(/\/+$/, "");
+  const baseUrl = (reqBase || c.env.EMBEDDING_BASE_URL || "https://api.openai.com/v1").replace(/\/+$/, "");
 
   try {
     const resp = await fetch(`${baseUrl}/images/generations`, {
