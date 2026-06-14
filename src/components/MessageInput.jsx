@@ -126,8 +126,6 @@ export default function MessageInput({
   const toolItems = [
     { id: 'image', label: '图片', icon: <ImageIcon /> },
     { id: 'camera', label: '拍照', icon: <CameraIcon /> },
-    { id: 'file', label: '上传文件', icon: <FileIcon /> },
-    { id: 'call', label: '电话', icon: <CallIcon /> },
   ];
 
   const selectTool = (id) => {

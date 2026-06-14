@@ -86,8 +86,8 @@ const KEEPSAKE_DRAFTS_KEY = "dukou:conversationKeepsakes";
 const DUKOU_LOCAL_PREFIX = "dukou:";
 
 const HELP_TEXT = {
-  chatTransport: "聊天请求要发往哪里。mock 只在前端假回复；direct_model 直连模型；kiwi_direct 走本机记忆网关；backend_gateway 是未来后端入口。",
-  memoryMode: "长期记忆由谁处理。mock 使用前端样例；kiwi_managed 表示长期记忆交给外部记忆网关，前端不看内部记忆。",
+  chatTransport: "聊天请求发往哪里。mock=前端假回复；direct_model=直连模型；kiwi_direct=走VPS kiwi-mem；backend_gateway=走Worker代理(key不暴露)。",
+  memoryMode: "长期记忆由 Worker/D1 管理（向量搜索+热度衰减+锁定+矛盾检测+情绪标记+每日总结）。",
   contextLog: "上下文日志只保存在本机，用来回看最近一次请求前准备了哪些上下文；它不保存 API key 或完整请求头。",
   indexedDbArchive: "IndexedDB 是浏览器本机的小数据库，用来存完整聊天归档，不会自动上传到云端。",
   apiKeyConfigured: "这里只显示是否填过 Key，不展示 Key 内容。kiwi_direct 和 backend_gateway 不要求前端保存真实模型 Key。",
@@ -442,7 +442,7 @@ function InlineNotice({ tone = "neutral", children }) {
 function HelpMark({ topic }) {
   const [open, setOpen] = useState(false);
   const text = HELP_TEXT[topic];
-  if (text ? false : true) return null;
+  if (!text) return null;
 
   return (
     <span className="settings-help">
@@ -614,9 +614,9 @@ function getLatestRouteStatus(chatTransport) {
 }
 
 function getMemoryConnectionLabel(logs, chatTransport) {
-  if (["kiwi_direct", "backend_gateway"].includes(chatTransport) ? false : true) return "未检测";
+  if (!["kiwi_direct", "backend_gateway"].includes(chatTransport)) return "未使用记忆路由";
   const related = logs.find((log) => ["kiwi_direct", "backend_gateway"].includes(log.chatTransport));
-  if (related ? false : true) return "未检测";
+  if (!related) return "暂无请求记录";
   return related.status === "success" ? "可达" : related.status === "error" ? "不可达" : "未检测";
 }
 

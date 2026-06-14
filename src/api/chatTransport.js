@@ -10,10 +10,6 @@ const EMPTY_USAGE = {
   cacheWriteTokens: 0,
 };
 
-const PLACEHOLDER_MESSAGES = {
-  backend_gateway: "backend_gateway 目前只是未来后端占位。本轮没有 Node / Express 网关请求。",
-};
-
 const KIWI_LOCAL_PLACEHOLDER_KEY = "dukou-kiwi-local";
 
 export function normalizeChatTransport(value) {
@@ -118,7 +114,7 @@ export async function sendChatRequest({
     transport: chatTransport,
     error: {
       type: "not_implemented",
-      message: PLACEHOLDER_MESSAGES[chatTransport],
+      message: `未知的 chatTransport: ${chatTransport}`,
     },
   };
 }
