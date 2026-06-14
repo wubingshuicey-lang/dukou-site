@@ -790,7 +790,14 @@ app.post("/api/chat", authMiddleware, async (c) => {
             })
             .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || b.score - a.score)
             .slice(0, 5);
-          if (scored.length) memoryContext = scored.map(m => m.text).join("\n");
+          // T2: 裁剪每条 ≤40 字 + T4: 去重相似记忆
+          const deduped = [];
+          for (const mem of scored) {
+            if (!deduped.some(d => d.text === mem.text || (d.text.length > 5 && mem.text.includes(d.text.slice(0, 10))))) {
+              deduped.push({ ...mem, text: mem.text.length > 40 ? mem.text.slice(0, 40) + "…" : mem.text });
+            }
+          }
+          if (deduped.length) memoryContext = deduped.map(m => m.text).join("\n");
         }
       }
     } catch {}

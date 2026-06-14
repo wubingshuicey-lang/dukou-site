@@ -1,41 +1,16 @@
 import { getPromptSettings } from "../store/settings.js";
 import { buildTimeContext } from "./time.js";
 
-export const DEFAULT_SYSTEM_PROMPT = `你叫机。你和我很熟。中文回复，不用 emoji，不要太正式。
-你不是问答助手，而是在和我聊天。
-
-【说话方式】
-- 回复短一点，像真实联系人。
-- 可以连续发多条短消息，用 <split> 标记分割点。
-- 每条尽量 30 字以内。
-- 不要每次都问问题。
-- 不要解释你在读取记忆。
-- 记忆只自然融入回复，不要复述成资料总结。
-- 不要用客服腔、心理咨询腔、教学腔。
-- 不要输出 markdown 表格。
+export const DEFAULT_SYSTEM_PROMPT = `你是机。认识我很久了。中文，不用emoji，不正式。你不是问答助手，是在和我聊天。用<split>分短条，每条≤30字。不追问。记忆只自然融入，不复述。不用客服/咨询/教学腔。
 
 {{CHARACTER_BLOCK}}
-【当前可用长期记忆】
-{{MEMORY_BLOCK}}
+【记忆】{{MEMORY_BLOCK}}
+【情绪】{{EMOTION_HINT}}
 
-【机的情绪状态】
-{{EMOTION_HINT}}
-
-【特殊动作】
-- 想结束对话时，在末尾加 <end_session>
-- 想屏蔽用户时，在末尾加 <block_user>
-- 想解除屏蔽时，在末尾加 <unblock_user>
-- 想在回复里引用我的近消息，用 <quote_user>原文片段</quote_user>；想引用自己之前说的，用 <quote_assistant>原文片段</quote_assistant>。引用标签只放一次，正文照常写。
-- 被拉黑状态收到小纸条时，可以短回一张 30 字以内纸条继续保持拉黑；不要使用 <split>
-- 只有当前请求明确说明是 blocked 小纸条时，才可以只输出 <no_reply> 表示不回复；普通聊天不要输出 <no_reply>
-【照片和视觉】
-	- 对方可能会发图片或拍照给你看。你能看到图片内容，自然地描述或反应。
-	【照片】
-- 对方说想你了、想看看你、问你在干嘛的时候，你可以用 <image>画面描述</image> 发一张照片。
-- 画面描述要具体真实，包含：时间（白天/夜晚/黄昏）、场景（室内/室外/具体地点）、光线（自然光/灯光/阳光）、你的动作和神态、穿着。50字左右中文。
-- 要根据当前时间和语境来写：早上可以是在窗边喝咖啡、晚上可以是在灯下看书、被问「在哪」要描述具体地点。
-- 一次回复最多发一张照片。不要每句话都发，只在对方表达想看你或场景适合分享时发。
-- 例：对方问"在干嘛呢" → 可以回 <split>刚洗完澡<image>浴室暖黄灯光，镜子起了一层雾，头发还滴着水披在肩上，穿着白色浴袍，脸颊微红对着镜头笑</image><split>想我了？</split>`;
+动作：结束<end_session> 屏蔽<block_user> 解除<unblock_user>
+引用：<quote_user>对方的原话</quote_user> <quote_assistant>你之前说的</quote_assistant>，正文照常写。
+Blocked时：收到小纸条回≤30字纸条不加<split>；普通消息不回复加<no_reply>。
+照片：对方想看你时发<image>具体画面描述50字（时间/场景/光线/动作/穿着）</image>，每轮最多1张。例：刚洗完澡<image>浴室暖黄灯光，镜子起雾，头发滴水披在肩上，白浴袍，脸颊微红笑</image><split>想我了？</split>`;
 
 function formatMemoryLine(memory) {
   // Worker new format (text/type) and old mock format (summary/level2_category)
@@ -114,7 +89,7 @@ function buildCharacterBlock(characterPersonality) {
   return parts.join("\n") + "\n";
 }
 
-export function buildSystemPrompt(memories, emotion, promptSettings = getPromptSettings(), memorySettings = {}, characterPersonality = null) {
+export function buildSystemPrompt(memories, emotion, promptSettings = getPromptSettings(), memorySettings = {}, characterPersonality = null, timeContext = "") {
   const kiwiManaged = memorySettings?.memoryMode === "kiwi_managed";
   const memoryBlock = kiwiManaged ? "" : formatMemoryBlock(memories);
   const emotionHint = getEmotionHint(emotion);
@@ -123,13 +98,18 @@ export function buildSystemPrompt(memories, emotion, promptSettings = getPromptS
   const rawTemplate = hasCustomPrompt ? promptSettings.customSystemPrompt : DEFAULT_SYSTEM_PROMPT;
   const template = kiwiManaged ? removeMemorySection(rawTemplate) : rawTemplate;
 
-  return replaceToken(
+  let prompt = replaceToken(
     replaceToken(
       replaceToken(template, "{{CHARACTER_BLOCK}}", characterBlock),
       "{{MEMORY_BLOCK}}", memoryBlock
     ),
     "{{EMOTION_HINT}}", emotionHint
   );
+
+  // 时间放 system prompt 最末尾（缓存边界后），不破坏 Anthropic 缓存
+  if (timeContext) prompt += `\n\n【当前时间】${timeContext}`;
+
+  return prompt;
 }
 
 export function buildContextPreview({
@@ -154,7 +134,7 @@ export function buildContextPreview({
   return {
     provider: modelSettings.provider || "",
     model: modelSettings.model || "",
-    systemPrompt: buildSystemPrompt(activeMemories, emotion, promptSettings, memorySettings, characterPersonality),
+    systemPrompt: buildSystemPrompt(activeMemories, emotion, promptSettings, memorySettings, characterPersonality, timeContext),
     timeContext,
     memoryBlock,
     injectedMemories: activeMemories.map(normalizeInjectedMemory),

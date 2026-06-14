@@ -1170,7 +1170,7 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
       });
       appendMessage(assistantMessage);
       if (persist) {
-        await insertMessage(assistantMessage);
+        insertMessage(assistantMessage);
       }
       await sleep(240);
     }
@@ -1209,7 +1209,7 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
         });
         appendMessage(imgMessage);
         if (persist) {
-          await insertMessage(imgMessage);
+          insertMessage(imgMessage);
         }
         scrollToBottom("smooth");
       } catch (err) {
@@ -1233,7 +1233,7 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
         });
         appendMessage(errBubble);
         if (persist) {
-          await insertMessage(errBubble).catch(() => {});
+          insertMessage(errBubble).catch(() => {});
         }
       }
     }
@@ -1336,7 +1336,6 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
     if (longTermMemory) {
       contextPreview.systemPrompt += `\n\n【长期记忆】${longTermMemory}`;
     }
-    const timeContext = { role: "user", content: contextPreview.timeContext };
     const uiAwarenessContext = buildUiAwarenessContext({
       affordanceState: readChatAffordanceState(),
     });
@@ -1356,14 +1355,13 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
       : null;
     const requestMessages = opening
       ? [
-          timeContext,
           ...awarenessMessages,
           {
             role: "user",
             content: "我刚刚打开了AI 陪伴前端。根据你们的历史说第一句话。不超过 20 字，不要问好，说点真实的。",
           },
         ]
-      : [timeContext, ...awarenessMessages, ...(blockedNoteInstruction ? [blockedNoteInstruction] : []), ...recentMessages];
+      : [...awarenessMessages, ...(blockedNoteInstruction ? [blockedNoteInstruction] : []), ...recentMessages];
     const contextLog = createContextLog(
       {
         trigger: opening ? "opening" : blockedNote ? "blocked_note" : "user_message",
@@ -1399,7 +1397,7 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
       });
       return opening
         ? requestMessages
-        : [timeContext, ...awarenessMessages, ...(blockedNoteInstruction ? [blockedNoteInstruction] : []), ...msgs];
+        : [...awarenessMessages, ...(blockedNoteInstruction ? [blockedNoteInstruction] : []), ...msgs];
     };
 
     let result = await sendChatRequest({
@@ -1641,7 +1639,7 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
               });
               appendMessage(msg);
               if (persisted) {
-                await insertMessage(msg).catch(() => {});
+                insertMessage(msg).catch(() => {});
               }
             }
             window.requestAnimationFrame(() => scrollToBottom("auto"));
@@ -1728,7 +1726,7 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
                       } else {
                         const msg = makeUiMessage(msgData);
                         appendMessage(msg);
-                        await insertMessage(msg);
+                        insertMessage(msg);
                         await sleep(420);
                       }
                     }
@@ -1786,7 +1784,7 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
       });
       appendMessage(failedMessage);
       if (persist) {
-        await insertMessage(failedMessage);
+        insertMessage(failedMessage);
       }
       return;
     }
@@ -2000,7 +1998,7 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
       await excludeMessages(target.cascade, "superseded");
       appendMessage(newUserMessage);
       if (persist) {
-        await insertMessage(newUserMessage);
+        insertMessage(newUserMessage);
       }
 
       await sleep(420);
@@ -2201,7 +2199,7 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
 
     try {
       if (persist) {
-        await insertMessage(noteMessage);
+        insertMessage(noteMessage);
       }
       await sleep(420);
       updateMessage(noteMessage.id, { read_by_du: true });
