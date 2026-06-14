@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { isLoggedIn, getUser } from "../api/apiClient.js";
 import { sendChatRequest } from "../api/chatTransport.js";
 import { getEmotionState, getInjectedMemories } from "../api/memory.js";
 import { exportMessagesJson, getMessageArchiveStats } from "../api/messageArchive.js";
@@ -791,6 +792,9 @@ function SettingsHome({ settings, modelStatus, homeScrollTop = 0, onHomeScrollCh
       <div className="settings-home-header">
         <span>DUKOU</span>
         <h1>设</h1>
+        <div style={{ fontSize: 11, marginTop: 4, color: isLoggedIn() ? "var(--accent-warm)" : "var(--danger)" }}>
+          {isLoggedIn() ? `已登录 · ${getUser()?.username || ""}` : "未登录 — 消息不会跨设备同步"}
+        </div>
       </div>
       <div className="settings-scroll" ref={scrollRef} onScroll={rememberScroll}>
         <CurrentModelCard settings={settings} modelStatus={modelStatus} onTest={onTest} onToggleTransport={onToggleTransport} />
