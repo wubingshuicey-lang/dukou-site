@@ -1205,7 +1205,7 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
           messageType: "text",
           conversationId: chatSpaceId,
           chatSpaceId,
-          meta: { source: "ai_generated", imagePrompt: prompt, savedToGallery: false },
+          meta: { source: "ai_generated", imagePrompt: prompt, savedToGallery: true },
         });
         appendMessage(imgMessage);
         if (persist) {
