@@ -1303,7 +1303,7 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
           : getInjectedMemories(memoryLimit, memorySettings)
         : [],
       getEmotionState(),
-      isCharSpace && isLoggedIn() ? searchRelevantMemories(chatSpaceId, userText, 5).catch(() => "") : Promise.resolve(""),
+      (isCharSpace && isLoggedIn() && chatTransport !== "backend_gateway") ? searchRelevantMemories(chatSpaceId, userText, 5).catch(() => "") : Promise.resolve(""),
       isCharSpace ? Promise.resolve(getLongTermMemory(chatSpaceId) || "") : Promise.resolve(""),
     ]);
     const recentMessages = getModelContextMessages(sourceMessages)
@@ -1328,13 +1328,14 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
         voiceMode: characterVoiceMode,
       } : null,
     });
-    // Inject cloud vector memory into system prompt
-    if (vectorMemoryText) {
-      contextPreview.systemPrompt += `\n\n【近期相关记忆】\n${vectorMemoryText}\n\n请自然融入对话，不要复述原始记忆。`;
-    }
-    // Inject long-term memory summary
-    if (longTermMemory) {
-      contextPreview.systemPrompt += `\n\n【长期记忆】${longTermMemory}`;
+    // backend_gateway 模式由 Worker 注入记忆，前端跳过避免重复搜索
+    if (chatTransport !== "backend_gateway") {
+      if (vectorMemoryText) {
+        contextPreview.systemPrompt += `\n\n【近期相关记忆】\n${vectorMemoryText}\n\n请自然融入对话，不要复述原始记忆。`;
+      }
+      if (longTermMemory) {
+        contextPreview.systemPrompt += `\n\n【长期记忆】${longTermMemory}`;
+      }
     }
     const uiAwarenessContext = buildUiAwarenessContext({
       affordanceState: readChatAffordanceState(),
