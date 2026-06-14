@@ -1612,11 +1612,9 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
           return;
         }
 
-        // 并行：本地 IndexedDB 秒开，云端后台同步不阻塞
-        const [_, recent] = await Promise.all([
-          loadCloudMessages(chatSpaceId, 50).catch(() => []),
-          getRecentMessages(50, { conversationId: chatSpaceId }),
-        ]);
+        // 先写云端消息进 IndexedDB，再读本地（有数据依赖，不能并行）
+        await loadCloudMessages(chatSpaceId, 50).catch(() => {});
+        const recent = await getRecentMessages(50, { conversationId: chatSpaceId });
         await markDuMessagesRead({ conversationId: chatSpaceId });
         if (cancelled) return;
         const readMessages = recent.map((message) =>
