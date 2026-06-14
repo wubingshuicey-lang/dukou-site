@@ -728,7 +728,7 @@ function patchContextLog(id, patch) {
 }
 
 async function maybeExtractMemories(chatSpaceId, messages, modelSettings) {
-  if (!chatSpaceId || !chatSpaceId.startsWith("char_")) return;
+  if (!chatSpaceId || chatSpaceId === "incognito" || chatSpaceId === "model-test") return;
   const visible = getVisibleMessages(messages);
   if (visible.length < 10 || visible.length % 10 !== 0) return;
 
