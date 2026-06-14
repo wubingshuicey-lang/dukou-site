@@ -1205,7 +1205,7 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
           messageType: "text",
           conversationId: chatSpaceId,
           chatSpaceId,
-          meta: { source: "ai_generated", imagePrompt: prompt, savedToGallery: false },
+          meta: { source: "ai_generated", imagePrompt: prompt, savedToGallery: true },
         });
         appendMessage(imgMessage);
         if (persist) {
@@ -1240,6 +1240,33 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
   };
 
   // Detect if user message suggests they want to see a photo of the character
+  const hasPhotoIntent = (userText) => {
+    const triggers = ["想看看你", "想你了", "在干嘛", "在做什么", "在哪", "照片", "自拍", "长什么样", "看看你", "拍一张", "发张"];
+    return triggers.some((t) => userText.includes(t));
+  };
+
+  // Fallback: when AI didn't use <image> tags but user clearly wants a photo,
+  // call AI separately to generate a scene description, then generate the image.
+  const generateImageFromContext = async (userText, chatSpaceId, persist) => {
+    const settings = characterModelSettings || getModelSettings();
+    if (!settings.apiKey) return;
+
+    try {
+      const result = await callModel({
+        messages: [{ role: "user", content: `用户说："${userText}"。根据当前时间（${new Date().toLocaleString("zh-CN")}）和语境，描述一张你（AI 角色）此刻的真实照片画面。包含：时间、场景、光线、你的动作神态、穿着。50字左右中文。只输出画面描述，不要加前缀。` }],
+        systemPrompt: "你是照片画面描述生成器。只输出具体的画面描述，不要加任何说明、前缀或评价。",
+        settings,
+      });
+      if (result.ok && result.text) {
+        const prompt = result.text.trim();
+        if (prompt) {
+          await generateImagesForReply([prompt], chatSpaceId, persist);
+        }
+      }
+    } catch {
+      // best-effort fallback
+    }
+  };
 
   const buildReplyParts = async ({
     userText = "",
@@ -1814,6 +1841,8 @@ export default function Chat({ pendingQuote, onPendingQuoteAccepted, onOpenSetti
       // Image generation runs regardless of text parts
       if (reply.imagePrompts?.length) {
         generateImagesForReply(reply.imagePrompts, chatSpaceId, persist);
+      } else if (hasPhotoIntent(text)) {
+        generateImageFromContext(text, chatSpaceId, persist);
       }
     } catch (error) {
       setModelError(normalizeModelError(error));
