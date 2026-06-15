@@ -1,17 +1,12 @@
 import { useState, useEffect } from "react";
-import { checkPassword } from "../store/auth.js";
 import { isLoggedIn, login, register, getUser } from "../api/apiClient.js";
 
 export default function LoginPage({ onLogin }) {
-  const [mode, setMode] = useState("cloud"); // "cloud" | "offline"
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [isRegister, setIsRegister] = useState(false);
-  const [offlinePassword, setOfflinePassword] = useState("");
-  const [offlineError, setOfflineError] = useState("");
-  const [shaking, setShaking] = useState(false);
 
   useEffect(() => {
     if (isLoggedIn()) {
@@ -20,7 +15,7 @@ export default function LoginPage({ onLogin }) {
     }
   }, [onLogin]);
 
-  async function handleCloudSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     if (!username.trim() || !password.trim()) return;
     setLoading(true);
@@ -31,28 +26,13 @@ export default function LoginPage({ onLogin }) {
       } else {
         await login(username.trim(), password.trim());
       }
+      // 清理旧版「离线模式」遗留的明文密码（迁移用，可安全保留）
+      localStorage.removeItem("dukou:auth");
       onLogin();
     } catch (err) {
       setError(err.message || (isRegister ? "注册失败" : "登录失败"));
     }
     setLoading(false);
-  }
-
-  function handleOfflineSubmit(e) {
-    e.preventDefault();
-    if (!offlinePassword.trim()) return;
-    if (checkPassword(offlinePassword.trim())) {
-      onLogin();
-    } else {
-      setOfflineError("密码错误");
-      setShaking(true);
-      setTimeout(() => setShaking(false), 500);
-    }
-  }
-
-  function switchToOffline() {
-    if (isLoggedIn()) { onLogin(); return; }
-    setMode("offline");
   }
 
   if (isLoggedIn() && getUser()) {
@@ -68,42 +48,13 @@ export default function LoginPage({ onLogin }) {
     );
   }
 
-  if (mode === "offline") {
-    return (
-      <div className="login-root">
-        <div className="login-card">
-          <div className="login-avatar">渡</div>
-          <h1 className="login-title">渡口</h1>
-          <p className="login-sub">离线模式，输入本地密码</p>
-          <form className={`login-form ${shaking ? "login-shake" : ""}`} onSubmit={handleOfflineSubmit}>
-            <input
-              className="login-input"
-              type="password"
-              placeholder="密码"
-              value={offlinePassword}
-              onChange={(e) => { setOfflinePassword(e.target.value); setOfflineError(""); }}
-              autoFocus
-            />
-            {offlineError && <p className="login-error">{offlineError}</p>}
-            <button className="login-btn" type="submit" disabled={!offlinePassword.trim()}>
-              进入
-            </button>
-          </form>
-          <button className="login-link" onClick={() => setMode("cloud")} style={{ marginTop: 12, background: "none", border: "none", color: "var(--text-sub)", cursor: "pointer", fontFamily: "inherit", fontSize: 13 }}>
-            切换到云端登录
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="login-root">
       <div className="login-card">
         <div className="login-avatar">渡</div>
         <h1 className="login-title">渡口</h1>
         <p className="login-sub">{isRegister ? "注册账号" : "云端登录"}</p>
-        <form className="login-form" onSubmit={handleCloudSubmit}>
+        <form className="login-form" onSubmit={handleSubmit}>
           <input
             className="login-input"
             type="text"
@@ -131,13 +82,6 @@ export default function LoginPage({ onLogin }) {
           style={{ marginTop: 8, background: "none", border: "none", color: "var(--text-sub)", cursor: "pointer", fontFamily: "inherit", fontSize: 13 }}
         >
           {isRegister ? "已有账号？去登录" : "没有账号？注册一个"}
-        </button>
-        <button
-          className="login-link"
-          onClick={switchToOffline}
-          style={{ marginTop: 4, background: "none", border: "none", color: "var(--text-sub)", cursor: "pointer", fontFamily: "inherit", fontSize: 13 }}
-        >
-          离线模式
         </button>
       </div>
     </div>
