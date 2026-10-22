@@ -189,7 +189,12 @@ function mergeModelSettings(value) {
   if (merged.provider === "kiwi_local") {
     merged.apiStyle = "openai_compatible";
     merged.baseUrl = merged.baseUrl || PROVIDER_PRESETS.kiwi_local.baseUrl;
-    merged.model = merged.model || PROVIDER_PRESETS.kiwi_local.defaultModel;
+    // 旧版本默认模型 qwen-plus-2025-12-01 会被 localStorage/云同步保留下来，
+    // 而 ZenMux 上游只认 OpenRouter 风格 provider/model 命名——做一次迁移兜底
+    merged.model =
+      merged.model && /^[\w.-]+\/[\w.-]+$/.test(merged.model)
+        ? merged.model
+        : PROVIDER_PRESETS.kiwi_local.defaultModel;
     merged.apiKey = "";
   }
 

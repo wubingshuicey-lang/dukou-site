@@ -12,17 +12,28 @@ const EMPTY_USAGE = {
 
 export function normalizeModelError(error) {
   const message = String(error?.message || error || "unknown");
+  const status = Number(error?.status || 0);
   if (/缺少/i.test(message)) {
     return { type: "config", message };
   }
-  if (/401|403|unauthorized|invalid api key|api key/i.test(message)) {
+  // Worker 登录态过期时保留原文提示，而不是误导用户去改 API Key
+  if (/登录|login|expired/i.test(message)) {
+    return { type: "auth", message };
+  }
+  if (status === 404 || /invalid.?model|model.*not.?found/i.test(message)) {
+    return { type: "config", message: message || "模型名不对" };
+  }
+  if (status === 401 || status === 403 || /401|403|unauthorized|invalid api key|api key/i.test(message)) {
     return { type: "auth", message: "API key 可能不对" };
   }
-  if (/429|rate limit|too many requests/i.test(message)) {
+  if (status === 429 || /429|rate limit|too many requests/i.test(message)) {
     return { type: "rate_limit", message: "请求太快了" };
   }
   if (/timeout|aborted/i.test(message)) {
     return { type: "timeout", message: "请求超时" };
+  }
+  if (status === 502 || /502|unreachable|连不上|网关/i.test(message)) {
+    return { type: "gateway_error", message: message || "网关暂时不可用" };
   }
   if (/network|fetch failed|failed to fetch/i.test(message)) {
     return { type: "network", message: "网络断了一下" };

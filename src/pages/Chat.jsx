@@ -281,15 +281,20 @@ function getSpaceMemorySettings(memorySettings, chatSpaceId) {
 
 function getSpaceTransportSettings(transportSettings, chatSpaceId) {
   const chatTransport = transportSettings?.chatTransport || "mock";
-  if (chatSpaceId === "main" || chatSpaceId.startsWith("char_")) return transportSettings;
+  // 把真实 chatSpaceId 带上：kiwi_direct/backend_gateway 用它做会话隔离
+  if (chatSpaceId === "main" || chatSpaceId.startsWith("char_")) {
+    return { ...transportSettings, chatSpaceId };
+  }
   if (chatSpaceId === "model_test") {
     return {
       ...transportSettings,
+      chatSpaceId,
       chatTransport: chatTransport === "mock" ? "mock" : "direct_model",
     };
   }
   return {
     ...transportSettings,
+    chatSpaceId,
     chatTransport: chatTransport === "direct_model" ? "direct_model" : "mock",
   };
 }

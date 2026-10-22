@@ -59,8 +59,20 @@ export async function callOpenAICompatible({ messages, systemPrompt, settings, s
 
   const data = await readResponseJson(response);
   if (!response.ok) {
-    const msg = data?.error?.message || data?.message || `HTTP ${response.status}`;
-    throw new Error(msg);
+    // 兼容两种错误形状：{error: "字符串"}（Worker authMiddleware/旧后端）
+    // 与 OpenAI 标准 {error: {message, type, code}}
+    const errObj = data?.error;
+    const msg =
+      (typeof errObj === "string" && errObj) ||
+      errObj?.message ||
+      (typeof data?.detail === "string" && data?.detail) ||
+      data?.message ||
+      `HTTP ${response.status}`;
+    const err = new Error(msg);
+    err.status = response.status;
+    err.code = errObj?.code;
+    err.errType = errObj?.type;
+    throw err;
   }
 
   return {

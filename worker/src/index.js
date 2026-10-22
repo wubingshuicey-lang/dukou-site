@@ -909,12 +909,23 @@ app.post("/v1/chat/completions", authMiddleware, async (c) => {
     });
     if (!resp.ok) {
       const txt = await resp.text().catch(() => "");
-      return c.json({ error: `kiwi-mem: ${resp.status}`, detail: txt.slice(0, 200) }, 502);
+      // OpenAI 形状的错误体：前端 openaiCompatible.js 只认 error.message，
+      // 字符串 error 会被折叠成「HTTP 502」导致用户看不到真实原因
+      return c.json({
+        error: {
+          message: `kiwi-mem 网关报错 (${resp.status})`,
+          type: resp.status === 404 ? "invalid_model" : resp.status === 401 ? "auth" : "gateway",
+          code: resp.status,
+          detail: txt.slice(0, 200),
+        },
+      }, 502);
     }
     const data = await resp.json();
     return c.json(data);
   } catch (err) {
-    return c.json({ error: `kiwi-mem unreachable: ${err.message}` }, 502);
+    return c.json({
+      error: { message: `kiwi-mem 网关连不上: ${err.message}`, type: "gateway", code: 0 },
+    }, 502);
   }
 });
 

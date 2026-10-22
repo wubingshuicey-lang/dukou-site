@@ -69,6 +69,9 @@ export async function sendChatRequest({
     }
     const kiwiPreset = PROVIDER_PRESETS.kiwi_local;
     const usesKiwiLocal = modelSettings?.provider === "kiwi_local";
+    const kiwiModel = usesKiwiLocal ? modelSettings.model || kiwiPreset.defaultModel : kiwiPreset.defaultModel;
+    // 兜底：非 provider/model 形式的旧模型名会打穿到 ZenMux 并 404
+    const safeKiwiModel = /^[\w.-]+\/[\w.-]+$/.test(kiwiModel) ? kiwiModel : kiwiPreset.defaultModel;
     return callModel({
       messages,
       systemPrompt,
@@ -77,7 +80,7 @@ export async function sendChatRequest({
         provider: "kiwi_local",
         apiStyle: "openai_compatible",
         baseUrl: usesKiwiLocal ? modelSettings.baseUrl || kiwiPreset.baseUrl : kiwiPreset.baseUrl,
-        model: usesKiwiLocal ? modelSettings.model || kiwiPreset.defaultModel : kiwiPreset.defaultModel,
+        model: safeKiwiModel,
         apiKey: token,
       },
       extraBody: { chatSpaceId: transportSettings?.chatSpaceId || "main" },
