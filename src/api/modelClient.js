@@ -30,12 +30,12 @@ export function normalizeModelError(error) {
   return { type: "unknown", message: message || "模型请求失败" };
 }
 
-export async function callModel({ messages, systemPrompt, settings = getModelSettings(), signal }) {
+export async function callModel({ messages, systemPrompt, settings = getModelSettings(), signal, extraBody }) {
   try {
     const result =
       settings.apiStyle === "anthropic"
         ? await callAnthropic({ messages, systemPrompt, settings, signal })
-        : await callOpenAICompatible({ messages, systemPrompt, settings, signal });
+        : await callOpenAICompatible({ messages, systemPrompt, settings, signal, extraBody });
 
     return {
       ok: true,

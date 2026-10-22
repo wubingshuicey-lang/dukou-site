@@ -60,7 +60,7 @@ export const PROVIDER_PRESETS = {
     label: "Kiwi Local",
     apiStyle: "openai_compatible",
     baseUrl: "https://dukou-api.wubingshuicey.workers.dev/v1",
-    defaultModel: "qwen-plus-2025-12-01",
+    defaultModel: "anthropic/claude-sonnet-5.5",
   },
   custom_openai_compatible: {
     label: "Custom",

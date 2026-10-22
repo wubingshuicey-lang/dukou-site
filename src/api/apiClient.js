@@ -26,6 +26,10 @@ export function isLoggedIn() {
   return !!getToken();
 }
 
+export function getApiToken() {
+  return getToken();
+}
+
 async function apiFetch(path, options = {}) {
   const token = getToken();
   const headers = { "Content-Type": "application/json", ...options.headers };

@@ -1,5 +1,5 @@
 import { callModel } from "./modelClient.js";
-import { chatViaGateway } from "./apiClient.js";
+import { chatViaGateway, getApiToken } from "./apiClient.js";
 import { PROVIDER_PRESETS, getModelSettings, getTransportSettings } from "../store/settings.js";
 
 const EMPTY_USAGE = {
@@ -9,8 +9,6 @@ const EMPTY_USAGE = {
   cacheReadTokens: 0,
   cacheWriteTokens: 0,
 };
-
-const KIWI_LOCAL_PLACEHOLDER_KEY = "dukou-kiwi-local";
 
 export function normalizeChatTransport(value) {
   return ["mock", "direct_model", "kiwi_direct", "backend_gateway"].includes(value) ? value : "mock";
@@ -56,6 +54,19 @@ export async function sendChatRequest({
   }
 
   if (chatTransport === "kiwi_direct") {
+    // Kiwi 网关在 Worker 后端，需要网站登录态（JWT）才能转发
+    const token = getApiToken();
+    if (!token) {
+      return {
+        ok: false,
+        text: "",
+        reasoningContent: "",
+        reasoningSource: undefined,
+        usage: EMPTY_USAGE,
+        transport: chatTransport,
+        error: { type: "config", message: "Kiwi 模式需要先登录账号" },
+      };
+    }
     const kiwiPreset = PROVIDER_PRESETS.kiwi_local;
     const usesKiwiLocal = modelSettings?.provider === "kiwi_local";
     return callModel({
@@ -67,8 +78,9 @@ export async function sendChatRequest({
         apiStyle: "openai_compatible",
         baseUrl: usesKiwiLocal ? modelSettings.baseUrl || kiwiPreset.baseUrl : kiwiPreset.baseUrl,
         model: usesKiwiLocal ? modelSettings.model || kiwiPreset.defaultModel : kiwiPreset.defaultModel,
-        apiKey: KIWI_LOCAL_PLACEHOLDER_KEY,
+        apiKey: token,
       },
+      extraBody: { chatSpaceId: transportSettings?.chatSpaceId || "main" },
       signal,
     });
   }

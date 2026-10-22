@@ -875,30 +875,36 @@ app.post("/api/images", authMiddleware, async (c) => {
   }
 });
 
-// --- Kiwi-Mem Proxy (VPS via serveo) ---
+// --- Kiwi-Mem Proxy (VPS 直连，不走隧道；8080 端口已用 iptables 限制为 Cloudflare 出口) ---
 
-const KIWI_BASE = "http://9519f89675ead802-151-245-90-140.serveousercontent.com/v1";
+const KIWI_BASE = "http://151.245.90.140:8080/v1";
 
 // OpenAI-compatible /v1/chat/completions → 转发到 kiwi-mem
 app.post("/v1/chat/completions", authMiddleware, async (c) => {
+  const userId = c.get("userId");
   const body = await c.req.json();
-  const { messages, model, max_tokens, temperature, stream } = body;
+  const { messages, model, max_tokens, temperature, stream, chatSpaceId } = body;
   if (!messages?.length) return c.json({ error: "messages empty" }, 400);
 
   // 提取 system prompt（kiwi-mem 会自动注入记忆）
   const systemMsg = messages.find(m => m.role === "system");
   const chatMessages = messages.filter(m => m.role !== "system");
 
+  // 按「用户 + 聊天空间」给 kiwi-mem 的 conversation_id 命名空间，
+  // 避免不同账号/不同角色的记忆互相串
+  const conversationId = `${userId}::${chatSpaceId || "main"}`;
+
   try {
     const resp = await fetch(`${KIWI_BASE}/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: model || "qwen-plus-2025-12-01",
+        model: model || "anthropic/claude-sonnet-5.5",
         messages: systemMsg ? [systemMsg, ...chatMessages] : chatMessages,
         max_tokens: max_tokens || 1000,
         temperature: temperature ?? 0.8,
         stream: stream || false,
+        conversation_id: conversationId,
       }),
     });
     if (!resp.ok) {

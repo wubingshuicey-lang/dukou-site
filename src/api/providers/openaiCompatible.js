@@ -28,7 +28,7 @@ function buildMessageContent(message) {
   return message.content;
 }
 
-export async function callOpenAICompatible({ messages, systemPrompt, settings, signal }) {
+export async function callOpenAICompatible({ messages, systemPrompt, settings, signal, extraBody }) {
   if (!settings?.apiKey) throw new Error("缺少 API Key");
   if (!settings?.baseUrl) throw new Error("缺少 Base URL");
   if (!settings?.model) throw new Error("缺少模型名");
@@ -53,6 +53,7 @@ export async function callOpenAICompatible({ messages, systemPrompt, settings, s
       temperature: Number(settings.temperature ?? 0.8),
       max_tokens: Number(settings.maxTokens ?? 1000),
       messages: [{ role: "system", content: systemPrompt }, ...apiMessages],
+      ...(extraBody || {}),
     }),
   });
 
