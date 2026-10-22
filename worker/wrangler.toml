@@ -25,4 +25,4 @@ database_name = "dukou-db"
 database_id = "f03c94d7-1ab1-41c7-9539-42e7cd907e57"
 
 [env.production.vars]
-JWT_SECRET = "879acb7dbc10d908bf87bcadd92f0fe272390e77ee3fc2cb478521c310235b25"
+# JWT_SECRET 通过 `wrangler secret put JWT_SECRET --env production` 加密存储，不进 git（仓库是公开的）
